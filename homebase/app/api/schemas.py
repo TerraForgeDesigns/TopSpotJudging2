@@ -79,4 +79,4 @@ class SubmissionsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     server_time: datetime
-    active_show: str | None
+    show_name: str | None

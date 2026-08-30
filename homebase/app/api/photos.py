@@ -27,7 +27,7 @@ _TYPE_SUFFIX = {"car": "car", "sheet": "sheet"}
 
 @router.post("/photos/upload")
 async def upload_photo(
-    registration_number: str = Form(...),
+    entry_number: str = Form(...),
     photo_type: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -40,10 +40,10 @@ async def upload_photo(
     if suffix is None:
         raise HTTPException(status_code=422, detail="photo_type must be 'car' or 'sheet'.")
 
-    registration_number = registration_number.strip()
+    entry_number = entry_number.strip()
     incoming_dir = PHOTOS_DIR / "_incoming" / uuid.uuid4().hex
     incoming_dir.mkdir(parents=True, exist_ok=True)
-    temp_path = incoming_dir / f"{registration_number}_{suffix}.jpg"
+    temp_path = incoming_dir / f"{entry_number}_{suffix}.jpg"
 
     try:
         with temp_path.open("wb") as out:
@@ -55,5 +55,5 @@ async def upload_photo(
     return {
         "status": result.status,
         "message": result.message,
-        "registration_number": result.registration_number,
+        "entry_number": result.entry_number,
     }

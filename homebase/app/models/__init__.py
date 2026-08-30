@@ -7,7 +7,6 @@ from app.models.app_settings import AppSettings
 from app.models.award import Award
 from app.models.base import Base
 from app.models.car import Car
-from app.models.car_class import CarClass
 from app.models.criteria import JudgingCriteria
 from app.models.enums import (
     AwardCategory,
@@ -22,11 +21,14 @@ from app.models.photo import Photo
 from app.models.show import Show
 from app.models.submission import JudgingScore, JudgingSubmission
 
+# NOTE: this file is mid-reconciliation against the Aug 2026 spec update —
+# CarClass is gone (step 1 of that reconciliation; see DECISIONS.md) but
+# the rest of these models still describe the OLD schema pending step 2
+# (full model rewrite), which follows immediately after this commit.
 __all__ = [
     "Base",
     "AppSettings",
     "Show",
-    "CarClass",
     "Car",
     "JudgingCriteria",
     "JudgingSubmission",

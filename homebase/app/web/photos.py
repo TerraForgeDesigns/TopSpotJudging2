@@ -3,11 +3,11 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import PhotoType
-from app.services import cars as cars_service
+from app.models import Car, PhotoType
 from app.services import photo_import_status as status_service
 from app.services.photo_ingest import list_unmatched_photos, resolve_unmatched_photo
 from app.services.usb_watcher import list_removable_drives, scan_and_ingest_drive
@@ -58,17 +58,20 @@ def photos_unmatched(request: Request, db: Session = Depends(get_db)):
     photos = list_unmatched_photos(db, show.id)
     groups: dict[str, list] = defaultdict(list)
     for photo in photos:
-        groups[photo.registration_number].append(photo)
+        groups[photo.entry_number].append(photo)
     # Judge sheet first within each group — that's usually where the
-    # registration number is handwritten, so it's the host's best clue.
+    # entry number is handwritten, so it's the host's best clue.
     grouped = [
-        {"registration_number": reg, "photos": sorted(items, key=lambda p: p.photo_type != PhotoType.JUDGE_SHEET)}
-        for reg, items in groups.items()
+        {"entry_number": entry_number, "photos": sorted(items, key=lambda p: p.photo_type != PhotoType.JUDGE_SHEET)}
+        for entry_number, items in groups.items()
     ]
 
     context = base_context(request, db, "/photos")
     context["groups"] = grouped
-    context["cars"] = cars_service.list_cars(db, show.id)
+    # No services/cars.py anymore (see DECISIONS.md — Cars UI is HB3) — this
+    # is the one place Photos still needs a car list, so it's inlined here
+    # rather than resurrecting that service for one read-only query.
+    context["cars"] = list(db.scalars(select(Car).where(Car.show_id == show.id).order_by(Car.entry_number)))
     return templates.TemplateResponse(request, "photos/unmatched.html", context)
 
 

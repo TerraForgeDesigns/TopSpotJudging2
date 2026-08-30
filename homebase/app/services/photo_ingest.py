@@ -9,7 +9,7 @@ Hard rules (CONTEXT.md — photos are irreplaceable after the show ends):
   - The original source file is only ever copied, never moved or deleted.
   - An existing photo is never overwritten. A second photo for the same
     car+type is kept alongside the first, flagged as a duplicate.
-  - A registration number that matches no car is never rejected — it's
+  - An entry number that matches no car is never rejected — it's
     held under photos/<show_id>/_unmatched/ for the host to resolve.
   - A thumbnail failure never fails the ingest — the original copy is
     what matters; thumbnail_path is just left null.
@@ -33,10 +33,10 @@ THUMBNAIL_MAX_SIZE = (400, 400)
 
 
 def parse_photo_filename(filename: str) -> tuple[str, PhotoType] | None:
-    """Returns (registration_number, photo_type), or None if `filename`
-    doesn't match {registration_number}_car.jpg / _sheet.jpg — case
-    insensitive, .jpeg tolerated. Greedy matching on the registration
-    number means an embedded underscore (e.g. "AB_12_car.jpg") still
+    """Returns (entry_number, photo_type), or None if `filename`
+    doesn't match {entry_number}_car.jpg / _sheet.jpg — case
+    insensitive, .jpeg tolerated. Greedy matching on the entry number
+    means an embedded underscore (e.g. "AB_12_car.jpg") still
     resolves correctly, since re backtracks to the LAST _car/_sheet."""
     suffix = Path(filename).suffix.lower()
     if suffix not in _ALLOWED_EXTENSIONS:
@@ -45,11 +45,11 @@ def parse_photo_filename(filename: str) -> tuple[str, PhotoType] | None:
     match = _FILENAME_RE.match(stem)
     if not match:
         return None
-    registration_number = match.group("reg").strip()
-    if not registration_number:
+    entry_number = match.group("reg").strip()
+    if not entry_number:
         return None
     photo_type = PhotoType.CAR if match.group("kind").lower() == "car" else PhotoType.JUDGE_SHEET
-    return registration_number, photo_type
+    return entry_number, photo_type
 
 
 def _type_slug(photo_type: PhotoType) -> str:
@@ -94,7 +94,7 @@ class IngestResult:
     status: str  # "matched" | "duplicate" | "unmatched" | "skipped" | "error"
     message: str
     photo: Photo | None = None
-    registration_number: str | None = None
+    entry_number: str | None = None
     source_filename: str = ""
 
 
@@ -106,11 +106,11 @@ def ingest_photo_file(
     if parsed is None:
         return IngestResult(
             status="skipped",
-            message=f"'{source_filename}' doesn't match the {{registration_number}}_car/_sheet.jpg pattern.",
+            message=f"'{source_filename}' doesn't match the {{entry_number}}_car/_sheet.jpg pattern.",
             source_filename=source_filename,
         )
 
-    registration_number, photo_type = parsed
+    entry_number, photo_type = parsed
     type_slug = _type_slug(photo_type)
 
     try:
@@ -119,35 +119,35 @@ def ingest_photo_file(
         return IngestResult(
             status="error",
             message=f"Couldn't read '{source_filename}': {exc}",
-            registration_number=registration_number,
+            entry_number=entry_number,
             source_filename=source_filename,
         )
 
     car = db.scalars(
-        select(Car).where(Car.show_id == show_id, Car.registration_number == registration_number)
+        select(Car).where(Car.show_id == show_id, Car.entry_number == entry_number)
     ).first()
 
     if car is None:
         dest_dir = PHOTOS_DIR / str(show_id) / "_unmatched"
-        already = _find_already_imported(dest_dir, f"{registration_number}_{type_slug}", source_size)
+        already = _find_already_imported(dest_dir, f"{entry_number}_{type_slug}", source_size)
         if already is not None:
             return IngestResult(
                 status="skipped",
                 message=f"Already imported as '{already.name}'.",
-                registration_number=registration_number,
+                entry_number=entry_number,
                 source_filename=source_filename,
             )
-        dest_path = _unique_path(dest_dir, f"{registration_number}_{type_slug}")
+        dest_path = _unique_path(dest_dir, f"{entry_number}_{type_slug}")
         status = "unmatched"
         car_id = None
     else:
-        dest_dir = PHOTOS_DIR / str(show_id) / registration_number
+        dest_dir = PHOTOS_DIR / str(show_id) / entry_number
         already = _find_already_imported(dest_dir, type_slug, source_size)
         if already is not None:
             return IngestResult(
                 status="skipped",
                 message=f"Already imported as '{already.name}'.",
-                registration_number=registration_number,
+                entry_number=entry_number,
                 source_filename=source_filename,
             )
         primary_path = dest_dir / f"{type_slug}.jpg"
@@ -166,7 +166,7 @@ def ingest_photo_file(
         return IngestResult(
             status="error",
             message=f"Couldn't copy '{source_filename}': {exc}",
-            registration_number=registration_number,
+            entry_number=entry_number,
             source_filename=source_filename,
         )
 
@@ -176,7 +176,7 @@ def ingest_photo_file(
     photo = Photo(
         show_id=show_id,
         car_id=car_id,
-        registration_number=registration_number,
+        entry_number=entry_number,
         photo_type=photo_type,
         status=PhotoStatus[status.upper()],
         transfer_method=transfer_method,
@@ -191,13 +191,13 @@ def ingest_photo_file(
     messages = {
         "matched": "Imported.",
         "duplicate": f"A {type_slug.replace('_', ' ')} photo already exists for this car — kept both, needs host resolution.",
-        "unmatched": f"No car found for registration number '{registration_number}' — held for manual resolution.",
+        "unmatched": f"No car found for entry number '{entry_number}' — held for manual resolution.",
     }
     return IngestResult(
         status=status,
         message=messages[status],
         photo=photo,
-        registration_number=registration_number,
+        entry_number=entry_number,
         source_filename=source_filename,
     )
 
@@ -225,7 +225,7 @@ def resolve_unmatched_photo(db: Session, photo_id: int, car_id: int) -> Photo:
     old_thumb_path = PHOTOS_DIR / photo.thumbnail_path if photo.thumbnail_path else None
 
     type_slug = _type_slug(photo.photo_type)
-    dest_dir = PHOTOS_DIR / str(photo.show_id) / car.registration_number
+    dest_dir = PHOTOS_DIR / str(photo.show_id) / car.entry_number
     primary_path = dest_dir / f"{type_slug}.jpg"
     if primary_path.exists():
         new_path = _unique_path(dest_dir, f"{type_slug}_duplicate")
@@ -242,7 +242,7 @@ def resolve_unmatched_photo(db: Session, photo_id: int, car_id: int) -> Photo:
         shutil.move(str(old_thumb_path), str(new_thumb_path))
 
     photo.car_id = car.id
-    photo.registration_number = car.registration_number
+    photo.entry_number = car.entry_number
     photo.status = new_status
     photo.file_path = new_path.relative_to(PHOTOS_DIR).as_posix()
     photo.thumbnail_path = new_thumb_path.relative_to(PHOTOS_DIR).as_posix() if new_thumb_path else None
@@ -254,7 +254,7 @@ def resolve_unmatched_photo(db: Session, photo_id: int, car_id: int) -> Photo:
 def get_car_photo(db: Session, car_id: int, photo_type: PhotoType) -> Photo | None:
     """The MATCHED photo of the given type for a car — e.g. the judge
     sheet photo shown on the car edit page next to Announcer Name, since
-    that's where the registration number (and often the announcer's name)
+    that's where the entry number (and often the announcer's name)
     is handwritten. Prefers MATCHED; falls back to the most recent
     DUPLICATE if that's all there is, rather than showing nothing."""
     matched = db.scalars(

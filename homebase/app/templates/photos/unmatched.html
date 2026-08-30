@@ -6,8 +6,8 @@
   <span class="page-header__eyebrow">{{ active_show.name }}</span>
   <h1>Unmatched photos</h1>
   <p style="color: var(--text-secondary); max-width: 60ch;">
-    These registration numbers didn't match a car in the roster. The judge sheet photo is shown
-    largest — the registration number is usually handwritten on it, which is the fastest way to
+    These entry numbers didn't match a car in the roster. The judge sheet photo is shown
+    largest — the entry number is usually handwritten on it, which is the fastest way to
     figure out where each one belongs.
   </p>
 </div>
@@ -17,7 +17,7 @@
   {% for group in groups %}
   <div class="card">
     <div class="card__header">
-      <h3 class="card__title">Reg # <span class="mono-label" style="text-transform: none; letter-spacing: 0; font-size: var(--text-lg); color: var(--text-primary);">{{ group.registration_number }}</span></h3>
+      <h3 class="card__title">Entry # <span class="mono-label" style="text-transform: none; letter-spacing: 0; font-size: var(--text-lg); color: var(--text-primary);">{{ group.entry_number }}</span></h3>
     </div>
 
     <form method="post" action="/photos/resolve" class="stack">
@@ -33,11 +33,11 @@
       {% endfor %}
 
       <div class="field">
-        <label class="field__label" for="car_id_{{ group.registration_number }}">Assign to car</label>
-        <select class="select" id="car_id_{{ group.registration_number }}" name="car_id" required>
+        <label class="field__label" for="car_id_{{ group.entry_number }}">Assign to car</label>
+        <select class="select" id="car_id_{{ group.entry_number }}" name="car_id" required>
           <option value="" disabled selected>Select a car…</option>
           {% for car in cars %}
-          <option value="{{ car.id }}">{{ car.registration_number }} — {{ car.year }} {{ car.make }} {{ car.model }}</option>
+          <option value="{{ car.id }}">{{ car.entry_number }} — {{ car.year or "" }} {{ car.make or "" }} {{ car.model or "" }}</option>
           {% endfor %}
         </select>
       </div>
