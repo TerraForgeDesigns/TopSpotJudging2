@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Cars — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Cars</h1>
+</div>
+
+{{ c.dashboard_tabs(active_show, "cars") }}
+
+<div class="row" style="margin-bottom: var(--space-6); justify-content: space-between;">
+  <div class="row" style="flex-wrap: wrap;" data-filter-scope="cars">
+    <input class="input" style="max-width: 160px;" type="text" placeholder="Entry number"
+      data-filter-for="cars" data-filter-key="number">
+    <input class="input" style="max-width: 220px;" type="text" placeholder="Search participant"
+      data-filter-for="cars" data-filter-key="participant">
+    <input class="input" style="max-width: 200px;" type="text" placeholder="Search make"
+      data-filter-for="cars" data-filter-key="make">
+    <select class="select" style="max-width: 200px;" data-filter-for="cars" data-filter-key="status">
+      <option value="">All statuses</option>
+      <option value="unjudged">Unjudged</option>
+      <option value="judged">Judged</option>
+      <option value="flagged_conflict">Flagged Conflict</option>
+    </select>
+  </div>
+  <a href="/shows/{{ active_show.id }}/edit#add-cars" class="btn btn-secondary">Add Cars</a>
+</div>
+
+{% if rows %}
+<div class="table-wrap table-wrap--scroll">
+  <table class="table" data-filter-table="cars">
+    <thead>
+      <tr>
+        <th>Entry #</th>
+        <th>Participant</th>
+        <th>Year</th>
+        <th>Make</th>
+        <th>Model</th>
+        <th>Vehicle Type</th>
+        <th>Status</th>
+        <th class="col-num">Score</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr data-row
+        data-number="{{ row.car.entry_number }}"
+        data-participant="{{ row.car.participant or '' }}"
+        data-make="{{ row.car.make or '' }}"
+        data-status="{{ row.car.status.value }}">
+        <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ row.car.entry_number }}</td>
+        <td>{{ row.car.participant or "—" }}</td>
+        <td>{{ row.car.year or "—" }}</td>
+        <td>{{ row.car.make or "—" }}</td>
+        <td>{{ row.car.model or "—" }}</td>
+        <td>{{ row.car.vehicle_type or "—" }}</td>
+        <td>
+          {% if row.car.status.value == "judged" %}
+          {{ c.pill("Judged", "judged") }}
+          {% elif row.car.status.value == "flagged_conflict" %}
+          {{ c.pill("Flagged Conflict", "conflict") }}
+          {% else %}
+          {{ c.pill("Unjudged", "unjudged") }}
+          {% endif %}
+        </td>
+        <td class="col-num">{{ row.score if row.score is not none else "—" }}</td>
+        <td><a href="/cars/{{ row.car.id }}/edit" class="btn btn-secondary btn--sm">Edit</a></td>
+      </tr>
+      {% endfor %}
+      <tr data-empty-row hidden>
+        <td colspan="9" style="text-align: center; color: var(--text-secondary);">No cars match these filters.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">No cars yet</h3>
+  <p>This show doesn't have any entries yet.</p>
+</div>
+{% endif %}
+{% endblock %}

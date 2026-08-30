@@ -9,30 +9,77 @@
 
 {{ c.dashboard_tabs(show, "edit_show") }}
 
-<div class="card" style="max-width: 640px;">
-  <form method="post" action="/shows/{{ show.id }}" class="stack">
-    <div class="field">
-      <label class="field__label" for="name">Show Name</label>
-      <input class="input" id="name" name="name" type="text" value="{{ show.name }}" required>
-    </div>
-    <div class="row" style="align-items: flex-start;">
+<div class="stack" style="max-width: 640px; gap: var(--space-8);">
+
+  <section class="card">
+    <h2 class="card__title" style="margin-bottom: var(--space-4);">Show Details</h2>
+    <form method="post" action="/shows/{{ show.id }}" class="stack">
       <div class="field">
-        <label class="field__label" for="event_date">Show Date</label>
-        <input class="input" id="event_date" name="event_date" type="date" value="{{ show.event_date.isoformat() }}" required>
+        <label class="field__label" for="name">Show Name</label>
+        <input class="input" id="name" name="name" type="text" value="{{ show.name }}" required>
+      </div>
+      <div class="row" style="align-items: flex-start;">
+        <div class="field">
+          <label class="field__label" for="event_date">Show Date</label>
+          <input class="input" id="event_date" name="event_date" type="date" value="{{ show.event_date.isoformat() }}" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="location">Location</label>
+          <input class="input" id="location" name="location" type="text" value="{{ show.location or '' }}">
+        </div>
       </div>
       <div class="field">
-        <label class="field__label" for="location">Location</label>
-        <input class="input" id="location" name="location" type="text" value="{{ show.location or '' }}">
+        <label class="field__label" for="notes">Notes</label>
+        <textarea class="textarea" id="notes" name="notes">{{ show.notes or '' }}</textarea>
       </div>
+      <div class="row">
+        {{ c.button("Save changes", "primary", type="submit") }}
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="add-cars">
+    <h2 class="card__title" style="margin-bottom: var(--space-2);">Add Cars</h2>
+    <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+      Adding cars assigns the next available entry numbers. Existing entries are never
+      renumbered and existing scores are never touched.
+    </p>
+
+    {% if add_cars_result %}
+    <div class="card" style="border-color: var(--green-500); margin-bottom: var(--space-5);">
+      <p class="card__body" style="color: var(--text-primary);">
+        Added {{ add_cars_result.added_count }} car{{ "s" if add_cars_result.added_count != 1 }}.
+        Entry numbers {{ add_cars_result.first_entry_number }} through {{ add_cars_result.last_entry_number }}.
+      </p>
+      <p class="card__body">Handhelds will pick these up automatically on their next update — nothing needs restarting.</p>
+      {% if add_cars_result.escalated %}
+      <p class="card__body" style="color: var(--gold-500);">
+        This show now has more cars, so judges will score each category from 1 to
+        {{ add_cars_result.new_score_range_max }}. Scores already recorded have been adjusted automatically.
+      </p>
+      {% endif %}
     </div>
-    <div class="field">
-      <label class="field__label" for="notes">Notes</label>
-      <textarea class="textarea" id="notes" name="notes">{{ show.notes or '' }}</textarea>
-    </div>
-    <div class="row">
-      {{ c.button("Save changes", "primary", type="submit") }}
-      <a href="/" class="btn btn-secondary">Cancel</a>
-    </div>
-  </form>
+    {% endif %}
+
+    <form method="post" action="/shows/{{ show.id }}/add-cars" class="stack" style="max-width: 320px;">
+      <div class="field">
+        <label class="field__label" for="count">How many cars do you want to add?</label>
+        <input class="input{{ ' input--error' if add_cars_error }}" id="count" name="count" type="number" min="1">
+        {% if add_cars_error %}<span class="field__error">{{ add_cars_error }}</span>{% endif %}
+      </div>
+      <div>{{ c.button("Add Cars", "primary", type="submit") }}</div>
+    </form>
+  </section>
+
+  <section class="card" id="judging-setup">
+    <h2 class="card__title" style="margin-bottom: var(--space-4);">Judging Setup</h2>
+    {% include "partials/edit_show_judging.html" %}
+  </section>
+
+  <section class="card" id="awards-setup">
+    <h2 class="card__title" style="margin-bottom: var(--space-4);">Awards</h2>
+    {% include "partials/edit_show_awards.html" %}
+  </section>
+
 </div>
 {% endblock %}

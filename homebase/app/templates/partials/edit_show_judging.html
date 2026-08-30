@@ -1,0 +1,49 @@
+{% import "components/macros.html" as c %}
+<div id="judging-setup-live">
+  <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+    Judges score each category from 1 to {{ show.score_range_max }}. This order also sets what
+    judges see on the handheld and which category settles a tie — dragging to change one changes both.
+  </p>
+
+  {% if category_error %}
+  <div class="card card--danger" style="margin-bottom: var(--space-4);">
+    <p class="card__body" style="color: var(--red-500);">{{ category_error }}</p>
+  </div>
+  {% endif %}
+
+  <div data-drag-list data-drag-order-input="category-order-input" class="stack" style="margin-bottom: var(--space-4);">
+    {% for category in categories %}
+    <div class="card draggable-item" draggable="true" data-drag-item data-drag-id="{{ category.id }}" style="padding: var(--space-4);">
+      <div class="row" style="flex-wrap: nowrap;">
+        <span class="drag-handle">⠿</span>
+        {{ c.toggle(
+          "toggle_category_" ~ category.id, checked=category.active,
+          extra_attrs='hx-post="/shows/' ~ show.id ~ '/categories/' ~ category.id ~ '/toggle" hx-target="#judging-setup-live" hx-swap="outerHTML" hx-trigger="change"'
+        ) }}
+        <input class="input" type="text" value="{{ category.name }}" style="max-width: 240px;"
+          hx-post="/shows/{{ show.id }}/categories/{{ category.id }}/rename"
+          hx-target="#judging-setup-live" hx-swap="outerHTML" hx-trigger="change" name="name">
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <input type="hidden" id="category-order-input" name="order"
+    hx-post="/shows/{{ show.id }}/categories/reorder" hx-target="#judging-setup-live" hx-swap="outerHTML" hx-trigger="change">
+
+  <div class="card" style="max-width: 240px; text-align: center; margin-bottom: var(--space-5);">
+    <div class="stat-card__label" style="justify-content: center;">Max Score</div>
+    <div class="stat-card__value" style="color: var(--gold-500);">{{ max_score }}</div>
+  </div>
+
+  <div>
+    <h3 style="margin-bottom: var(--space-1);">Ask judges for an overall impression of each car?</h3>
+    <p class="field__hint" style="margin-bottom: var(--space-3);">Used only to settle ties — it doesn't count toward a car's total or Max Score.</p>
+    <label class="row" style="cursor: pointer;">
+      {{ c.toggle(
+        "overall_impression", checked=show.overall_impression_enabled,
+        extra_attrs='hx-post="/shows/' ~ show.id ~ '/overall-impression/toggle" hx-target="#judging-setup-live" hx-swap="outerHTML" hx-trigger="change"'
+      ) }}
+      <span>{{ "On" if show.overall_impression_enabled else "Off" }}</span>
+    </label>
+  </div>
+</div>

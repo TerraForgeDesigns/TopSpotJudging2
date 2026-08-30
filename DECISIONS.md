@@ -7,6 +7,58 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Cars, Add Cars, Judging Setup, and Awards management built for real — see
+  CONTEXT.md's Cars and Edit Show sections.** Notable choices:
+  - **Judging and Awards no longer have their own top-level dashboard pages —
+    both now live as sections inside Edit Show.** The instruction that drove
+    this ("EDIT SHOW, grouped by what the organiser is trying to do") lists
+    Judging Setup and Awards as two of Edit Show's four groups, which
+    conflicts with CONTEXT.md's original 8-tab dashboard IA (where Judging
+    and Awards were separate top-level sections). Resolved by keeping the
+    dashboard tab strip's 8 labels exactly as CONTEXT.md specifies, but
+    pointing the "Judging" and "Awards" tabs at `/shows/{id}/edit#judging-
+    setup` and `#awards-setup` — real anchors on the real Edit Show page,
+    not separate pages. Visiting either highlights "Edit Show" as the active
+    tab (no scroll-position tracking); that's genuinely which page you're on.
+    `/criteria` and `/awards` as standalone routes are gone — nothing links
+    to them anymore, see `web/stubs.py`.
+  - **Add Cars renders its confirmation directly on the same page instead of
+    redirecting.** A redirect-after-POST would have to carry "Added 25 cars,
+    entries 311–335, and the range escalated to 1–10" through a URL — either
+    truncating the message or leaking wire-style state into a query string.
+    Rendering the Edit Show page directly from the POST handler (200, not
+    303) keeps the full plain-language confirmation intact at the cost of
+    the page not being a bookmarkable/refreshable URL after the action,
+    which doesn't matter here.
+  - **`services/cars.py::add_cars()` composes car-creation, the
+    `show_data_revision` bump, and `check_and_escalate()` into one
+    transaction, committing once at the end.** This is the exact scenario
+    the transaction-boundary fix (see the HB2 review entry, below) was
+    written for — see `test_add_cars_crossing_a_tier_escalates_and_converts_
+    existing_scores` in `tests/test_cars.py`.
+  - **`can_deactivate_category()`'s message now names an exact judged-car
+    count** ("3 cars have already been judged on Paint..."), not just
+    "cars have" — CONTEXT.md's protection-rule wording asked for this
+    explicitly. Counts DISTINCT cars with an ACCEPTED submission scoring
+    that category, not raw `JudgingScore` rows (which could double-count a
+    car with a rejected/duplicate submission too).
+  - **New services, each owning exactly one concern:** `services/cars.py`
+    (Entry management — list/edit/add, never touches `entry_number` once
+    set), `services/judging_categories.py` (post-creation category
+    toggle/rename/reorder + Overall Impression, enforcing
+    `judging_category_rules.py`'s guard), `services/awards_setup.py`
+    (post-creation award add/rename/reorder/toggle/winner-choice — named
+    `_setup`, not `awards.py`, to leave that name free for HB7's
+    winner-*resolution* logic, which this module deliberately never
+    touches). Every mutation in all three goes through
+    `services/revisions.py` — verified by grep: `show.configuration_revision
+    +=`/`show.show_data_revision +=` appear ONLY in revisions.py itself
+    (two lines, one each). `car.data_revision_at_change = ...` appears in
+    `services/cars.py` and `services/sync.py`, both only AFTER calling
+    `bump_show_data_revision()` and both stamping with its already-bumped
+    return value — that's the field a Car row uses to record which
+    revision it last changed under, not a second place the counter itself
+    gets written.
 - **HB2 review fixes (six, applied together — see each for detail):**
   1. **`check_and_escalate()` no longer commits — the caller does, matching
      `services/revisions.py`'s existing contract, which it had been silently

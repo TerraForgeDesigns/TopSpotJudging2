@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.web.cars import router as cars_router
 from app.web.handhelds import router as handhelds_router
 from app.web.pages import router as pages_router
 from app.web.photos import router as photos_router
@@ -11,6 +12,7 @@ router = APIRouter()
 router.include_router(pages_router)
 router.include_router(show_wizard_router)
 router.include_router(shows_router)
+router.include_router(cars_router)
 router.include_router(photos_router)
 router.include_router(handhelds_router)
 router.include_router(stubs_router)

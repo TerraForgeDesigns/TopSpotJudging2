@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Entry {{ car.entry_number }} — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Entry {{ car.entry_number }}</h1>
+</div>
+
+<div class="card" style="max-width: 560px;">
+  <form method="post" action="/cars/{{ car.id }}/edit" class="stack">
+    <div class="field">
+      <label class="field__label">Entry Number</label>
+      <input class="input" type="text" value="{{ car.entry_number }}" disabled>
+      <span class="field__hint">Entry numbers are assigned automatically and can't be changed.</span>
+    </div>
+    {{ c.field("Participant", "participant", value=car.participant or "", required=False) }}
+    <div class="row" style="align-items: flex-start;">
+      {{ c.field("Year", "year", value=car.year or "", required=False) }}
+      {{ c.field("Make", "make", value=car.make or "", required=False) }}
+      {{ c.field("Model", "model", value=car.model or "", required=False) }}
+    </div>
+    {{ c.field("Vehicle Type", "vehicle_type", value=car.vehicle_type or "", required=False) }}
+    <div class="row">
+      {{ c.button("Save", "primary", type="submit") }}
+      <a href="/cars" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% import "components/macros.html" as c %}
+<div id="awards-setup-live">
+  <div data-drag-list data-drag-order-input="award-order-input" class="stack" style="margin-bottom: var(--space-6);">
+    {% for award in awards %}
+    <div class="card draggable-item" draggable="true" data-drag-item data-drag-id="{{ award.id }}" style="padding: var(--space-4);">
+      <div class="row" style="justify-content: space-between; flex-wrap: nowrap;">
+        <div class="row" style="flex: 1; min-width: 0;">
+          <span class="drag-handle">⠿</span>
+          {{ c.toggle(
+            "toggle_award_" ~ award.id, checked=award.active,
+            extra_attrs='hx-post="/shows/' ~ show.id ~ '/awards/' ~ award.id ~ '/toggle" hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change"'
+          ) }}
+          <input class="input" type="text" value="{{ award.name }}" style="max-width: 220px;"
+            hx-post="/shows/{{ show.id }}/awards/{{ award.id }}/rename"
+            hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change" name="name">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: var(--space-3); margin-left: 32px; align-items: flex-start;">
+        <div class="row" style="gap: var(--space-2);">
+          <label class="row" style="cursor: pointer; gap: var(--space-1);">
+            <input type="radio" name="judge_chosen_{{ award.id }}" value="yes" {{ 'checked' if award.judge_chosen }}
+              hx-post="/shows/{{ show.id }}/awards/{{ award.id }}/winner-choice" hx-include="closest .card"
+              hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change" data-winner-choice-radio="{{ award.id }}">
+            Judges nominate
+          </label>
+          <label class="row" style="cursor: pointer; gap: var(--space-1);">
+            <input type="radio" name="judge_chosen_{{ award.id }}" value="no" {{ 'checked' if not award.judge_chosen }}
+              hx-post="/shows/{{ show.id }}/awards/{{ award.id }}/winner-choice" hx-include="closest .card"
+              hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change" data-winner-choice-radio="{{ award.id }}">
+            You choose
+          </label>
+        </div>
+        <div data-winner-basis="{{ award.id }}"{{ ' hidden' if not award.judge_chosen }}>
+          <select class="select" name="ranking_basis"
+            hx-post="/shows/{{ show.id }}/awards/{{ award.id }}/winner-choice" hx-include="closest .card"
+            hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change">
+            {% for value, label in ranking_basis_options %}
+            <option value="{{ value.value }}" {{ 'selected' if award.ranking_basis == value }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <p class="field__hint" style="margin-top: var(--space-2); margin-left: 32px;">
+        {% if award.judge_chosen %}
+        Judges will nominate cars for this{{ " — decided by " ~ ranking_basis_labels.get(award.ranking_basis, award.ranking_basis) if award.ranking_basis }}.
+        {% else %}
+        You'll choose the winner.
+        {% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+  <input type="hidden" id="award-order-input" name="order"
+    hx-post="/shows/{{ show.id }}/awards/reorder" hx-target="#awards-setup-live" hx-swap="outerHTML" hx-trigger="change">
+
+  <h3 style="margin-bottom: var(--space-3);">Add Award</h3>
+  <form class="stack" style="max-width: 420px;"
+    hx-post="/shows/{{ show.id }}/awards/add" hx-target="#awards-setup-live" hx-swap="outerHTML">
+    {{ c.field("Award Name", "name", placeholder="e.g. Sponsor's Choice", required=False, error=add_award_errors.get("name", "")) }}
+    <div class="field">
+      <label class="field__label">Will judges choose this winner?</label>
+      <div class="row">
+        <label class="row" style="cursor: pointer; gap: var(--space-2);">
+          <input type="radio" name="judge_chosen" value="yes" checked data-add-award-judge-chosen> Yes
+        </label>
+        <label class="row" style="cursor: pointer; gap: var(--space-2);">
+          <input type="radio" name="judge_chosen" value="no" data-add-award-judge-chosen> No
+        </label>
+      </div>
+    </div>
+    <div class="field" data-add-award-ranking-basis>
+      <label class="field__label" for="new_award_basis">Which score should decide the winner?</label>
+      <select class="select" id="new_award_basis" name="ranking_basis">
+        {% for value, label in ranking_basis_options %}
+        <option value="{{ value.value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if add_award_errors.get("ranking_basis") %}<span class="field__error">{{ add_award_errors.ranking_basis }}</span>{% endif %}
+    </div>
+    <div>{{ c.button("Add Award", "secondary", type="submit") }}</div>
+  </form>
+</div>
+<script>
+  (function () {
+    var radios = document.querySelectorAll("#awards-setup-live [data-add-award-judge-chosen]");
+    var basisField = document.querySelector("#awards-setup-live [data-add-award-ranking-basis]");
+    if (radios.length && basisField) {
+      var sync = function () {
+        var yes = document.querySelector("#awards-setup-live [data-add-award-judge-chosen][value='yes']");
+        basisField.hidden = !(yes && yes.checked);
+      };
+      radios.forEach(function (r) { r.addEventListener("change", sync); });
+      sync();
+    }
+
+    document.querySelectorAll("#awards-setup-live [data-winner-choice-radio]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        var id = radio.dataset.winnerChoiceRadio;
+        var basis = document.querySelector('#awards-setup-live [data-winner-basis="' + id + '"]');
+        if (basis) basis.hidden = radio.value !== "yes";
+      });
+    });
+  })();
+</script>
