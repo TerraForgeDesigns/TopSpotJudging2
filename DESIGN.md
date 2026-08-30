@@ -17,6 +17,17 @@ status. Status uses green/blue/red exclusively. This means a gold element always
 "this is the thing to press," and a colored dot always means "this is a state." Do not
 let this erode over time — it's what keeps the UI legible at a glance.
 
+## Writing interface text
+
+Visual design and interface language are equally binding — see
+[LANGUAGE.md](LANGUAGE.md) for the full standard. In short: this interface is operated
+by people running a car show, not developers, so technical vocabulary (sync,
+criterion, configuration, payload, endpoint, revision...) never appears in normal UI
+text on either platform, no matter how correct it is internally. Every user-facing
+error states what happened and what to do about it, not just what failed. When in
+doubt about wording, LANGUAGE.md's mapping table is authoritative — check it before
+shipping new copy on any screen.
+
 ## Color tokens
 
 Define these as CSS custom properties in the web app, and as named color constants in

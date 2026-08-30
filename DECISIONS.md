@@ -7,6 +7,90 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Major show-model overhaul (Aug 2026 spec update): no roster import, ever.**
+  CSV/spreadsheet import is removed entirely — it will not be built. At show creation
+  the organiser only states a car count; Home Base generates that many sequential
+  entry numbers (001, 002, ... zero-padded to three digits) with every field empty.
+  Whoever reaches an entry first — a judge in the field, or the host correcting it
+  later — fills in Participant/Year/Make/Model. This replaces "Registration Number"
+  (paper form, pre-existing) with **Entry Number** (system-generated) everywhere in
+  the vocabulary — see CONTEXT.md's glossary. **Existing homebase code
+  (`services/car_import.py`, the CSV import UI) is now spec-obsolete** — flagged as an
+  OPEN item below for a dedicated future implementation prompt; this session changed
+  specs only, no app code.
+- **Score range is fully automatic, and only ever moves up.** Set from car count
+  (1-150→1-5, 151-300→1-10, 301+→1-25, open-ended), never an organiser setting. Once a
+  show crosses a threshold it never drops back, even if cars are later removed —
+  removing a car must never recalculate other scores downward. Judging Categories are
+  a fixed set of five built-ins (Engine, Exterior, Interior, Paint, Wheels/Tires), each
+  independently on/off and renameable; **no mechanism to add new categories will be
+  built.** Max Score = active categories × range max, always computed. Full rules and
+  the score table live in CONTEXT.md.
+- **Score conversion on range escalation uses decimal arithmetic with explicit
+  ROUND_HALF_UP, never Python's built-in `round()`.** `round()`'s banker's rounding
+  would turn `2.5` into `2` instead of `3`, silently changing a judge's original
+  scoring intent. Formula and verified fixture tables are in CONTEXT.md. All three of
+  `original_points`, `original_range_max`, and `adjusted_points` are stored — the
+  original is never overwritten, and every later conversion re-derives from it rather
+  than compounding rounding error across multiple escalations.
+- **Tie-breaking is a primary mechanism, not an edge case — formalized as a 4-step
+  cascade** (total adjusted score → Overall Impression if enabled → organiser-defined
+  category priority order → ask the organiser, never silent, never by database id).
+  Rationale: auto-scaling the score range keeps ranking *resolution* roughly constant
+  rather than improving it, because car count grows with the range — the
+  organiser-provided density figures for this are 7.1, 6.5, and 4.1 cars per distinct
+  total across the three tiers, and at 400 cars on the 1–25 tier there are only 121
+  possible totals with real judging clustering near the top. Ties at award boundaries
+  are the normal case this system is built for, not a rare exception. **This resolves
+  the old "Tie-break rule when two cars have identical total scores" OPEN item**
+  (removed from Open, below).
+- **Overall Impression is a Show Setup toggle, off by default, used only for
+  tie-breaking.** One extra per-car score in the show's current range when enabled;
+  never counts toward the total or Max Score. Off by default because at the 1-25 tier
+  it costs judges an entire extra screen per car, and most shows won't need it.
+- **Awards redesigned around two mechanisms: Top Awards (fully automatic, organiser
+  only picks a count from a fixed list) and Show Awards (seven configurable built-ins,
+  nomination-based for judge-chosen ones).** A judge-chosen Show Award is a
+  *nomination* during judging, not a score or a pick — the judge is saying a car
+  belongs in the conversation; Home Base alone determines the winner among nominated
+  cars, ranked by that award's basis (own-category score for Best Paint/Interior/
+  Engine, Total score for Best Car/Truck/Bike/Rat Rod), with its own tie cascade
+  (basis → Overall Impression if enabled → Total score if not already the basis →
+  organiser decides). An organiser-chosen award (created by answering "Will judges
+  choose this winner?" with No) never reaches a handheld at all — Home Base's "Choose
+  Winner" lets the organiser pick any car directly, which is the right shape for
+  Sponsor's/Mayor's/People's Choice or a memorial award with no scoring rule.
+  Switching an award from judge-chosen to organiser-chosen mid-show **keeps existing
+  nominations in the database but stops using them for the winner**, and Home Base
+  states this plainly rather than silently dropping them.
+- **Car Class is removed, superseded by the nomination-based Show Awards system.** The
+  new spec's awards model (Best Car/Truck/Bike/Rat Rod, judge-nominated, ranked by
+  Total score) replaces what "Best in Class" was doing, and nothing in the Aug 2026
+  spec references Car Class or class-based grouping. **This is an inference, not
+  something the spec update stated outright — flagged to the user for confirmation**
+  (see Open, below) before the `CarClass` model, its show-setup UI, and any
+  class-based award logic are actually deleted from `/homebase`. Also resolves the old
+  "Whether the show uses Car Classes at all" OPEN item (removed from Open, below).
+- **Sync redesigned around two monotonically increasing revision counters
+  (`configuration_revision`, `show_data_revision`) instead of timestamps, on a single
+  unified `POST /api/v1/sync` endpoint** that replaces the old `GET /sync/roster` +
+  `POST /sync/submissions` pair. Rationale: handhelds have no battery-backed clock and
+  take their time from Home Base, so comparing integers across devices is more
+  reliable than comparing timestamps that could be wrong before the first sync of the
+  day. Idempotency key is now the triple `(entry_number, handheld_id,
+  closed_at_uptime_ms)` — a retry with the same triple returns `"already_recorded"`
+  and changes nothing, distinct from a genuine conflict (same entry_number, different
+  `closed_at_uptime_ms`). **`score_range_max` is mandatory on every submission** so
+  Home Base can convert a submission that was scored before a range escalation the
+  handheld hasn't caught up to yet. Full contract in PROTOCOL.md. **Existing homebase
+  code implementing the old two-endpoint protocol is now spec-obsolete** — same
+  future-prompt flag as the import code above.
+- **LANGUAGE.md created — as binding as DESIGN.md.** Principle: the interface is
+  operated by people running a car show, not developers; technical vocabulary (API,
+  sync, criterion, configuration, payload, etc.) lives in code/database/diagnostic
+  logs only, never in normal user-facing text. Carries the full never-use →
+  use-instead mapping table and the error-message standard (every user-facing error
+  states what happened and what to do). DESIGN.md now references it.
 - **Handheld hardware contract locked in (F1 — hardware bring-up):** Elecrow CrowPanel
   ESP32 Display 7" (DIS08070H V3.0), ESP32-S3-WROOM-1-N4R8, 800x480 RGB parallel LCD
   (not SPI TFT), GT911 capacitive touch over I2C, onboard microSD, Arducam Mega 5MP
@@ -215,8 +299,9 @@ building on top of it. Newest entries at the top of each section.
   at the event.
 - **PlatformIO + Arduino framework for ESP32-S3 firmware.**
 - **Registration number is the human-facing primary key and the photo-matching key.**
-  See [CONTEXT.md](CONTEXT.md) glossary and [PROTOCOL.md](PROTOCOL.md) photo naming
-  convention.
+  *(Superseded by the Aug 2026 spec update above — see "Entry Number" in
+  [CONTEXT.md](CONTEXT.md)'s glossary. Left here as history, not current guidance.)*
+  See [PROTOCOL.md](PROTOCOL.md) photo naming convention.
 - **Photos transfer post-judging only, USB primary / WiFi fallback.** Never during
   active judging — see CONTEXT.md workflow section for why.
 - **Scan-first sync with backoff.** Full trigger/backoff model in PROTOCOL.md.
@@ -225,6 +310,40 @@ building on top of it. Newest entries at the top of each section.
 
 ## Open
 
+- **Confirm Car Class removal.** DECISIONS.md above treats Car Class as superseded by
+  the new nomination-based Show Awards, but the Aug 2026 spec update never said so
+  explicitly — this is this session's inference. Confirm before deleting `CarClass`,
+  its show-setup UI, or any class-based award logic from `/homebase`.
+- **Homebase app code is now stale against the Aug 2026 spec update — needs a
+  dedicated implementation prompt.** Specifically: `services/car_import.py` and the
+  CSV import UI (roster import is removed entirely — see Decided); the
+  `GET /sync/roster` + `POST /sync/submissions` handlers (replaced by unified
+  `POST /api/v1/sync`); anything keying off `registration_number` (renamed
+  `entry_number` everywhere); the old fixed/organiser-chosen score range in show setup
+  (now automatic); and the existing awards model (single winner-per-award, no
+  nomination, no Top Awards). This spec-rewrite session made no app code changes per
+  its own instructions — all of the above still reflects the pre-Aug-2026 design until
+  a future prompt rebuilds it.
+- **`vehicle_additions` / approved vehicle names ("SPEC-C") is referenced but not yet
+  specified.** The Aug 2026 spec update names `make_manually_entered` /
+  `model_manually_entered` on a submission and a `vehicle_additions` field in the sync
+  response, pointing at a controlled make/model vocabulary spec that hasn't been
+  written yet. PROTOCOL.md documents the field's presence in the wire contract; its
+  actual semantics (what makes an addition "approved," how it propagates back to
+  handhelds) are undefined until that spec arrives.
+- **Exact field-level shape of the `configuration` object in `POST /api/v1/sync`'s
+  response is inferred, not dictated.** PROTOCOL.md lists what it must logically carry
+  (active Judging Categories with names/priority order, current score range, Overall
+  Impression enabled flag, judge-chosen Show Awards for nomination) based on what
+  handhelds need to render judging correctly, but the Aug 2026 spec update didn't give
+  a field-by-field schema. Nail this down in the implementation prompt that builds the
+  new sync endpoint.
+- **How an entry number physically reaches a car in the field is unspecified.** The
+  old workflow had a pre-printed paper registration form; the new one only specifies
+  that Home Base generates entry numbers 001..N at show creation. Whether that means
+  printed entry cards, a check-in station, or something else isn't part of the Aug
+  2026 spec update — CONTEXT.md's workflow section deliberately doesn't invent an
+  answer.
 - **No duplicate-photo resolution UI yet.** `PhotoStatus.DUPLICATE` photos are counted
   in the import summary and kept on disk, but there's no screen to view them side by
   side and pick a winner (unlike unmatched photos, which do have a resolution view at
@@ -236,9 +355,6 @@ building on top of it. Newest entries at the top of each section.
   screen to pre-register, rename, or deprovision one. Fine for now with 3–4 known
   devices; revisit if that becomes error-prone (e.g. a typo'd `handheld_id` on the
   firmware side silently creating a phantom handheld).
-- **Tie-break rule when two cars have identical total scores.** Currently surfaced to
-  the host for a manual decision in the results/awards flow — no automatic rule.
-  Revisit if hosts want this automated later.
 - **Battery voltage monitoring — no ADC pin identified yet.** The CrowPanel 7" has a
   JST battery connector with a charge circuit, but no documented voltage-sense ADC
   anywhere (checked Elecrow's wiki, both community example repos, and an ESPHome PR
@@ -263,10 +379,6 @@ building on top of it. Newest entries at the top of each section.
   reflashing becomes much less convenient. No native-USB fallback: GPIO19/20 (the
   ESP32-S3's fixed native USB pins) are permanently wired to GT911 touch I2C on this
   board.
-- **Whether the show uses Car Classes at all, or judges one combined field.** Affects
-  whether "Best in Class" awards are always available or need to be conditionally
-  hidden/disabled when a show doesn't define classes. Affects home base show-setup UI
-  and the awards presentation flow.
 
 ## Notes for future sessions
 
