@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ eyebrow }}</span>
+  <h1>{{ title }}</h1>
+</div>
+
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">Not built yet</h3>
+  <p style="color: var(--text-secondary); max-width: 60ch;">{{ message }}</p>
+</div>
+{% endblock %}

@@ -1,6 +1,13 @@
 """
-Dashboard stats and handheld sync status. Read-only queries — the dashboard
-polls this every 15s (see web/pages.py), so keep it cheap.
+Dashboard stats and handheld sync status. Read-only queries — the
+dashboard polls this every 15s (see web/pages.py), so keep it cheap.
+
+DashboardSummary is deliberately its own type, not api/schemas.py's
+ProtocolSummary — see Correction 2 / DECISIONS.md. Today they happen to
+hold the same four fields, computed the same way; that's a coincidence,
+not a contract. This one is free to grow (awards readiness, photo
+status, judging progress — see CONTEXT.md's 8-section Show Dashboard,
+HB2) without ever touching the wire contract.
 """
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,19 +26,19 @@ STALE_THRESHOLD_SECONDS = 15 * 60
 
 
 @dataclass
-class ShowSummary:
+class DashboardSummary:
     total_cars: int
     judged: int
     unjudged: int
     flagged_conflict: int
 
 
-def get_summary(db: Session, show_id: int) -> ShowSummary:
+def get_summary(db: Session, show_id: int) -> DashboardSummary:
     rows = db.execute(
         select(Car.status, func.count(Car.id)).where(Car.show_id == show_id).group_by(Car.status)
     ).all()
     counts = {status: count for status, count in rows}
-    return ShowSummary(
+    return DashboardSummary(
         total_cars=sum(counts.values()),
         judged=counts.get(CarStatus.JUDGED, 0),
         unjudged=counts.get(CarStatus.UNJUDGED, 0),

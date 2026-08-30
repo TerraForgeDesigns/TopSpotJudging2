@@ -10,10 +10,6 @@ router = APIRouter()
 
 
 def _dashboard_live_context(request: Request, db: Session) -> dict:
-    # NOTE: mid-reconciliation against the Aug 2026 spec update — this is
-    # step 1's minimal unblock so `import app.main` succeeds; the real
-    # dashboard fix (dropping unmatched_count, which had no equivalent
-    # once entries are pre-generated — see DECISIONS.md) lands in step 7.
     context = base_context(request, db, "/")
     show = context["active_show"]
     if show is not None:
@@ -22,7 +18,6 @@ def _dashboard_live_context(request: Request, db: Session) -> dict:
     else:
         context["summary"] = None
         context["handheld_statuses"] = []
-    context["unmatched_count"] = 0
     return context
 
 

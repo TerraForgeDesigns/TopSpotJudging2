@@ -19,19 +19,6 @@
     </a>
   </div>
 
-  {% if unmatched_count %}
-  <div class="card card--danger" style="margin-bottom: var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);">
-    <div>
-      <h3 class="card__title" style="color: var(--red-500); margin-bottom: var(--space-1);">
-        {{ unmatched_count }} unmatched submission{{ "s" if unmatched_count != 1 }}
-      </h3>
-      <p class="card__body">Scored under a registration number not in the current roster — a judge may
-        have scored a car before it was registered here.</p>
-    </div>
-    <a href="/conflicts" class="btn btn-destructive" style="flex-shrink: 0;">Reconcile</a>
-  </div>
-  {% endif %}
-
   <section class="section">
     <h2 class="section__title">Handhelds</h2>
     {% if handheld_statuses %}
