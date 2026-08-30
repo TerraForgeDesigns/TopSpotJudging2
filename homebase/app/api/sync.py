@@ -47,7 +47,9 @@ def sync(payload: SyncRequest, request: Request, db: Session = Depends(get_db)):
 
     handheld = sync_service.get_or_create_handheld(db, payload.handheld_id)
     client_ip = request.client.host if request.client else None
-    sync_service.touch_handheld_sync(db, handheld, client_ip, payload.battery_pct)
+    sync_service.touch_handheld_sync(
+        db, handheld, client_ip, payload.battery_pct, payload.config_revision, payload.data_revision
+    )
 
     results = [sync_service.process_submission(db, show, handheld, item) for item in payload.submissions]
 

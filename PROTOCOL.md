@@ -156,6 +156,27 @@ has escalated (see CONTEXT.md). Home Base has no other way to tell a 4-out-of-5 
 Home Base converts before storing (per CONTEXT.md's conversion formula) and keeps the
 values exactly as sent for the audit trail.
 
+#### Score validation
+
+Every active Judging Category must have an entry in `scores`, and each score's
+`points` must fall within `1..score_range_max` — the submission's own
+`score_range_max` as sent, not the show's current range. Either problem
+rejects the WHOLE item with `status: "error"` and a message naming the
+category and the problem (e.g. "Paint has not been scored. Choose a Paint
+score before continuing." or "Paint score of 12 is outside the allowed range
+(1-5)."). Never a partial score set, and never a silent 0 for an unscored
+category — see CONTEXT.md: there is no zero and no "not applicable."
+
+#### Entry details: fill or correct
+
+`participant`/`year`/`make`/`model`/`vehicle_type` on a submission apply to
+its entry this way: a blank field on the entry is always filled from the
+submission. A field that already holds a value is overwritten only when the
+submission's value is both non-empty and different from what's stored —
+that's a judge correcting a wrong pre-fill, not a conflict — and it's applied
+directly. Corrections are logged internally (diagnostic log, not a
+user-facing error) and never rejected or flagged back to the handheld.
+
 #### Idempotency
 
 A handheld that loses the connection before receiving an acknowledgement **will
@@ -183,9 +204,14 @@ timestamp using its own clock at receipt.
 approved vehicle names a handheld can offer instead of free text. The full semantics
 (what makes an addition "approved," how it propagates back out to other handhelds)
 are defined by SPEC-B, in the master build guide (the three-layer vehicle database,
-review queue, and vehicle_additions spec) — not yet implemented (HB5 builds the
-services; see `app/models/vehicle.py`, which already has the tables). This document
-only commits to the field's presence in the wire contract; see DECISIONS.md.
+review queue, and vehicle_additions spec).
+
+What exists today: whenever either manually-entered flag is true, Home Base records a
+candidate sighting for that make/model pairing (`services/vehicle_candidates.py`) —
+raw material for the review queue. `vehicle_additions` in the response is still always
+`[]`: the review/approval workflow that decides what counts as "approved" (and the
+revision-style delta logic to only send what's new since the handheld's last update)
+is HB5's job, not built yet — see DECISIONS.md.
 
 ### `POST /api/v1/photos/upload`
 

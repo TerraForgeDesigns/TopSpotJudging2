@@ -7,6 +7,63 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **POST /api/v1/sync brought fully into line with PROTOCOL.md — field names
+  and shapes kept exactly as documented there, not the paraphrased
+  terminology ("JudgingResult," "client_closed_at_uptime_ms,"
+  "submitted_range_max," "last_changed_revision") used to describe the work.**
+  The task that drove this was explicit that PROTOCOL.md is what the firmware
+  is built against and must be implemented exactly — so where a description
+  of the work used different words for a concept PROTOCOL.md already names
+  (`JudgingSubmission`, `closed_at_uptime_ms`, the submission's own
+  `score_range_max`, `Car.data_revision_at_change`), the document's actual
+  name was kept rather than renaming the codebase to match an informal
+  paraphrase. Real changes made:
+  - **Score validation**: an active category with no score, or a score
+    outside `1..score_range_max`, now rejects the WHOLE item (`status:
+    "error"`, naming the category and the problem) before anything is
+    written. This didn't exist before — a missing category score was
+    previously silently absent from the stored result, and any integer was
+    accepted regardless of range. Both are real correctness gaps: CONTEXT.md
+    is explicit that there is no zero and no "not applicable" for an active
+    category, and `scoring.py::build_ranking_key` already raises rather than
+    defaulting a missing score to 0 (see the HB2 review's fix) — this closes
+    the gap on the way IN, so that code path can't be reached by a bad
+    submission in the first place. PROTOCOL.md documents this behavior now.
+  - **Entry-detail corrections**: a submission's participant/year/make/
+    model/vehicle_type now overwrites an existing non-empty value on the
+    entry when the submission's value is non-empty AND different — not just
+    fills blanks, as before. This is a judge correcting a wrong pre-fill, not
+    a conflict; it's applied directly and logged (Python `logging`, not a
+    stored audit row — nothing in the schema needed a place to put one, and
+    LANGUAGE.md already treats this class of detail as belonging in
+    diagnostic logs, not the interface). PROTOCOL.md documents the rule.
+  - **`Handheld.last_config_revision`/`last_data_revision`** — new columns,
+    updated on every sync from what the handheld itself reported at the top
+    of the request. Purely informational (future host-facing "this handheld
+    is behind" diagnostics); Home Base's own delta logic never reads them —
+    it always compares against the request payload directly.
+  - **New `services/vehicle_candidates.py`**: a manually-entered make or
+    model now actually records a `VehicleCandidate`/`VehicleCandidateSighting`
+    pair (find-by-normalized-key, increment `times_seen`, add a sighting) —
+    this data existed as schema since HB1 but nothing ever wrote to it.
+    `vehicle_additions` in the sync response is still always `[]`: deciding
+    what counts as "approved" and computing a since-last-update delta for it
+    is HB5's review-queue work, not this task's. PROTOCOL.md's
+    `vehicle_additions (deferred)` section now describes exactly this split
+    (sighting-recording live, approval/delta still pending) instead of
+    implying nothing happens yet.
+  - **Flagged, not resolved: PROTOCOL.md's documented `configuration.
+    judge_chosen_awards` shape is `{id, name}` only.** The task describing
+    this work also asked for awards in `configuration` to carry
+    `chosen_by_judge`/`ranking_basis`. Neither appears in PROTOCOL.md's own
+    example, and neither is something a handheld has any functional use for
+    (nomination is "mark this car," not a ranking computation — that's
+    entirely Home Base's job) — every award already in `judge_chosen_awards`
+    is by construction judge-chosen, and ranking basis doesn't affect
+    anything the handheld renders. Left unchanged (`{id, name}`) rather than
+    guessed at, since PROTOCOL.md is the declared source of truth here;
+    flagged for the user to confirm one way or the other rather than picked
+    silently.
 - **Cars, Add Cars, Judging Setup, and Awards management built for real — see
   CONTEXT.md's Cars and Edit Show sections.** Notable choices:
   - **Judging and Awards no longer have their own top-level dashboard pages —

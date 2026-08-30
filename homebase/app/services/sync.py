@@ -4,12 +4,27 @@ layer (app/api/sync.py) is a thin wire-format wrapper; this module owns
 idempotency, score conversion on receipt, revision bookkeeping, and
 applying a submission's details onto its Car.
 
-Rewritten in full against the Aug 2026 spec update (see DECISIONS.md):
-entries are pre-created 001..N at show creation, so there is no more
+Entries are pre-created 001..N at show creation, so there is no more
 "unmatched, held" submission state — an entry_number either resolves to
 an existing Car or the whole item is rejected as an error. Idempotency
 key is (entry_number, handheld_id, closed_at_uptime_ms), not a timestamp.
+
+process_submission()'s order, matching PROTOCOL.md exactly:
+  1. Idempotency check — a retry of an already-recorded submission must
+     be recognized before anything else, or a lost-ack retry from a
+     roaming handheld manufactures a false conflict every time.
+  2. Validate the item as a whole (unknown category, a missing score for
+     an active category, an out-of-range score) — reject the WHOLE item
+     before writing anything, never a partial score set.
+  3. Duplicate-conflict check against any existing accepted result.
+  4. Accept: convert scores, create the result/scores/nominations, mark
+     the car judged.
+  5. Apply entry details (fill blanks always; overwrite a differing
+     non-empty value and log the correction).
+  6. Record a New Vehicle Names candidate sighting if either manually-
+     entered flag is set.
 """
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -31,6 +46,9 @@ from app.models import (
 )
 from app.services.revisions import bump_show_data_revision
 from app.services.score_conversion import convert_score
+from app.services.vehicle_candidates import record_sighting as record_vehicle_candidate_sighting
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_handheld(db: Session, handheld_id: str) -> Handheld:
@@ -47,12 +65,21 @@ def get_or_create_handheld(db: Session, handheld_id: str) -> Handheld:
     return handheld
 
 
-def touch_handheld_sync(db: Session, handheld: Handheld, client_ip: str | None, battery_pct: int | None) -> None:
+def touch_handheld_sync(
+    db: Session,
+    handheld: Handheld,
+    client_ip: str | None,
+    battery_pct: int | None,
+    config_revision: int,
+    data_revision: int,
+) -> None:
     handheld.last_sync_at = datetime.now(timezone.utc)
     if client_ip:
         handheld.last_ip = client_ip
     if battery_pct is not None:
         handheld.battery_pct = battery_pct
+    handheld.last_config_revision = config_revision
+    handheld.last_data_revision = data_revision
     db.commit()
 
 
@@ -138,27 +165,80 @@ def _find_repeat(db: Session, entry_number: str, handheld_id: int, closed_at_upt
     ).first()
 
 
-def _apply_details_if_empty(car: Car, item: SubmissionIn) -> bool:
-    """Whoever reaches an entry first fills it in (CONTEXT.md) — a
-    submission's details are applied only to fields the car doesn't
-    already have, never overwriting what an earlier judge (or the host)
-    already entered. Returns True if anything actually changed."""
-    changed = False
+def _validate_scores(
+    show: Show, item: SubmissionIn
+) -> tuple[list[tuple[JudgingCategory, int]], str | None]:
+    """Returns (resolved (category, points) pairs, error message). A
+    non-None error means reject the WHOLE item — a car's total only
+    means something if every active category was recorded, and an
+    out-of-range point value is a data problem, not something to clamp
+    silently. See CONTEXT.md: no zero, no "not applicable," minimum 1."""
+    categories_by_id = {c.id: c for c in show.categories}
+    active_categories = {c.id: c for c in show.categories if c.active}
+
+    resolved: list[tuple[JudgingCategory, int]] = []
+    problems: list[str] = []
+    seen_category_ids: set[int] = set()
+
+    for score_in in item.scores:
+        category = categories_by_id.get(score_in.category_id)
+        if category is None:
+            problems.append(f"Unknown judging category id {score_in.category_id}.")
+            continue
+        seen_category_ids.add(category.id)
+        if not (1 <= score_in.points <= item.score_range_max):
+            problems.append(
+                f"{category.name} score of {score_in.points} is outside the allowed range "
+                f"(1-{item.score_range_max})."
+            )
+            continue
+        resolved.append((category, score_in.points))
+
+    missing = [c for cid, c in active_categories.items() if cid not in seen_category_ids]
+    for category in missing:
+        problems.append(f"{category.name} has not been scored. Choose a {category.name} score before continuing.")
+
+    if problems:
+        return [], " ".join(problems)
+    return resolved, None
+
+
+def _apply_details(db: Session, show: Show, car: Car, item: SubmissionIn) -> None:
+    """Whoever reaches an entry first fills it in (CONTEXT.md). A blank
+    field is always filled from the submission. A field that already has
+    a value is only overwritten when the handheld's value is non-empty
+    AND different — that's a judge correcting a wrong pre-fill, not a
+    conflict, so it's applied directly and logged (diagnostic log, not a
+    user-facing message — see LANGUAGE.md: technical detail belongs in
+    logs, not the interface)."""
     for field in ("participant", "year", "make", "model", "vehicle_type"):
-        incoming = getattr(item, field)
-        if incoming and not getattr(car, field):
+        incoming = (getattr(item, field) or "").strip()
+        if not incoming:
+            continue
+        current = getattr(car, field)
+        if current is None:
             setattr(car, field, incoming)
-            changed = True
+        elif incoming != current:
+            logger.info(
+                "Entry %s: %s corrected from %r to %r by handheld submission.",
+                car.entry_number, field, current, incoming,
+            )
+            setattr(car, field, incoming)
+
     if item.make_manually_entered:
         car.make_manually_entered = True
     if item.model_manually_entered:
         car.model_manually_entered = True
-    return changed
+
+    if item.make_manually_entered or item.model_manually_entered:
+        record_vehicle_candidate_sighting(db, show, car, item.make, item.model)
 
 
 def process_submission(db: Session, show: Show, handheld: Handheld, item: SubmissionIn) -> SubmissionResult:
     entry_number = item.entry_number.strip()
 
+    # 1. Idempotency — checked before anything else, including whether the
+    # entry number even exists, so a retry is always recognized as such.
     repeat = _find_repeat(db, entry_number, handheld.id, item.closed_at_uptime_ms)
     if repeat is not None:
         return SubmissionResult(
@@ -175,25 +255,13 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
             message=f"Entry number '{entry_number}' not found.",
         )
 
-    categories_by_id = {c.id: c for c in show.categories}
-    resolved_scores: list[tuple[JudgingCategory, int]] = []
-    unknown_ids: list[int] = []
-    for score_in in item.scores:
-        category = categories_by_id.get(score_in.category_id)
-        if category is None:
-            unknown_ids.append(score_in.category_id)
-        else:
-            resolved_scores.append((category, score_in.points))
-    if unknown_ids:
-        # Reject the whole item rather than importing a partial score set —
-        # a car's total only means something if every category was
-        # recorded (see CONTEXT.md: failures must be visible, never silent).
-        return SubmissionResult(
-            entry_number=entry_number,
-            status="error",
-            message=f"Unknown judging category id(s): {', '.join(str(i) for i in unknown_ids)}",
-        )
+    # 2. Validate the whole item before writing anything.
+    resolved_scores, error = _validate_scores(show, item)
+    if error:
+        return SubmissionResult(entry_number=entry_number, status="error", message=error)
 
+    # 3. Duplicate-conflict check — a second accepted result never
+    # overwrites the first, regardless of which handheld sent it.
     existing_accepted = db.scalars(
         select(JudgingSubmission).where(
             JudgingSubmission.car_id == car.id, JudgingSubmission.status == SubmissionStatus.ACCEPTED
@@ -201,6 +269,7 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
     ).first()
     status = SubmissionStatus.FLAGGED_DUPLICATE if existing_accepted is not None else SubmissionStatus.ACCEPTED
 
+    # 4. Accept: convert and store.
     submission = JudgingSubmission(
         show_id=show.id,
         car_id=car.id,
@@ -236,9 +305,11 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
         if award is not None and award.show_id == show.id and award.judge_chosen:
             db.add(AwardNomination(submission_id=submission.id, award_id=award_id))
 
-    details_changed = False
     if status == SubmissionStatus.ACCEPTED:
-        details_changed = _apply_details_if_empty(car, item)
+        # 5 + 6. Apply details (fill/correct) and record a vehicle
+        # candidate sighting — only for the accepted result; a
+        # flagged_duplicate never touches the car's own details.
+        _apply_details(db, show, car, item)
         car.status = CarStatus.JUDGED
     else:
         car.status = CarStatus.FLAGGED_CONFLICT
