@@ -8,17 +8,16 @@ class CarStatus(str, enum.Enum):
 
 
 class SubmissionStatus(str, enum.Enum):
-    PENDING = "pending"
     ACCEPTED = "accepted"
     FLAGGED_DUPLICATE = "flagged_duplicate"
     REJECTED = "rejected"
-    # Registration number didn't match any car in the roster at submission
-    # time (e.g. a late-registered car judged before the handheld's roster
-    # pull caught up). Held for host reconciliation — see PROTOCOL.md sync
-    # notes in DECISIONS.md. Not a wire-protocol status: the API reports
-    # these as "accepted" (see api/sync.py _wire_status), since the handheld
-    # doesn't need to know or care that reconciliation is pending.
-    UNMATCHED = "unmatched"
+    # NOTE: no UNMATCHED here anymore. Under the old CSV-import model a
+    # submission's registration number could arrive before the matching
+    # car did. Under the Aug 2026 spec, entries 001..N are all created up
+    # front at show creation — an entry_number a submission names either
+    # resolves to an existing Car or it doesn't exist at all, which is a
+    # wire-level "error" result (see services/sync.py), not a row held for
+    # later reconciliation. See DECISIONS.md.
 
 
 class PhotoType(str, enum.Enum):
@@ -26,18 +25,46 @@ class PhotoType(str, enum.Enum):
     JUDGE_SHEET = "judge_sheet"
 
 
-class AwardCategory(str, enum.Enum):
-    OVERALL = "overall"  # e.g. Best in Show — ranked by total score across the whole show
-    CRITERIA = "criteria"  # e.g. Best Paint — ranked by a single criterion's score
-    CLASS = "class"  # e.g. Best in Class: Trucks — ranked by total score within one class
-
-
 class PhotoStatus(str, enum.Enum):
     MATCHED = "matched"  # normal case: resolved to a car, no conflict
     DUPLICATE = "duplicate"  # car+type slot was already filled — both kept, host resolves
-    UNMATCHED = "unmatched"  # registration number didn't match any car — held for host to assign
+    # Photos still arrive by filename (USB/WiFi), independent of the
+    # pre-generated entry roster, so a typo'd or stale entry_number in a
+    # photo filename can still miss — unlike submissions (see
+    # SubmissionStatus above), this UNMATCHED case is unchanged.
+    UNMATCHED = "unmatched"
 
 
 class TransferMethod(str, enum.Enum):
     USB = "usb"
     WIFI = "wifi"
+
+
+class AwardRankingBasis(str, enum.Enum):
+    """What decides a judge-chosen award's winner among nominated cars —
+    see CONTEXT.md Awards section. Null on an Award row when judge_chosen
+    is False (an organiser-chosen award has no ranking basis at all)."""
+
+    TOTAL = "total"
+    ENGINE = "engine"
+    EXTERIOR = "exterior"
+    INTERIOR = "interior"
+    PAINT = "paint"
+    WHEELS_TIRES = "wheels_tires"
+
+
+class VehicleSource(str, enum.Enum):
+    """Keeps installation-learned vehicle names separable from the
+    bundled seed list so a future seed replacement can never destroy
+    what judges have actually typed in at real shows — see CONTEXT.md
+    and DECISIONS.md. Load-bearing: do not collapse into a boolean."""
+
+    SEED = "seed"
+    LEARNED = "learned"
+
+
+class VehicleCandidateStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    IGNORED = "ignored"
+    MERGED = "merged"

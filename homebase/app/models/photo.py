@@ -12,15 +12,16 @@ class Photo(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # show_id is set at ingest time — needed because an UNMATCHED photo has
-    # no car to derive a show from (same reasoning as JudgingSubmission).
+    # no car to derive a show from.
     show_id: Mapped[int] = mapped_column(ForeignKey("shows.id"), nullable=False, index=True)
-    # Nullable: a photo whose registration number matched no car
+    # Nullable: a photo whose entry number matched no car
     # (PhotoStatus.UNMATCHED) has no car to point at yet.
     car_id: Mapped[int | None] = mapped_column(ForeignKey("cars.id"), nullable=True, index=True)
     # What the filename (or WiFi upload form field) actually said — kept
-    # even after resolution, independent of the car's current registration
-    # number, which may later be edited.
-    registration_number: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    # even after resolution, independent of the car's current entry
+    # number (entry numbers don't change post-creation, but this still
+    # decouples the two in case that ever isn't true).
+    entry_number: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
     photo_type: Mapped[PhotoType] = mapped_column(
         Enum(PhotoType, native_enum=False, validate_strings=True, length=32), nullable=False
     )
