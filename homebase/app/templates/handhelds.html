@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Handhelds — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Handhelds</h1>
+</div>
+
+{{ c.dashboard_tabs(active_show, "handhelds") }}
+
+{% if handheld_statuses %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Last Update</th>
+        <th class="col-num">Battery</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for hs in handheld_statuses %}
+      <tr>
+        <td>{{ hs.handheld.label }}</td>
+        <td>{{ hs.relative_sync }}</td>
+        <td class="col-num">{{ hs.battery_pct ~ "%" if hs.battery_pct is not none else "—" }}</td>
+        <td>
+          {% if hs.sync_state == "fresh" %}
+          {{ c.pill("Up to Date", "judged") }}
+          {% elif hs.sync_state == "stale" %}
+          {{ c.pill("Updating", "pending") }}
+          {% else %}
+          {{ c.pill("Not Connected", "conflict") }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">No handhelds yet</h3>
+  <p>Handhelds appear here after their first update with Home Base.</p>
+</div>
+{% endif %}
+{% endblock %}

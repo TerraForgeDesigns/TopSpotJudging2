@@ -7,6 +7,104 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Early-scaling nudge on the Number of Cars wizard step exists because
+  score conversion is lossy in a specific, non-obvious way: it coarsens
+  resolution, it doesn't add it.** A car judged at 1-5 and later scaled to
+  1-25 can only ever land on 5, 10, 15, 20, or 25 — the conversion is exact
+  arithmetic (`original × new_max / original_max`), but the judge's original
+  choice only ever had 5 discrete values to begin with, so the scaled-up
+  result inherits that coarseness permanently; it can never fill in the
+  10 intermediate values a car judged fresh at 1-25 could land on. A host
+  whose estimate is close to a tier threshold (140-150, 290-300) is
+  gambling that their count won't tip over mid-show and coarsen every
+  early car's resolution relative to later ones judged fresh at the
+  higher range. Nudging them to enter their real expected total up front
+  costs nothing and avoids that outcome entirely. See
+  `services/show_wizard.py::near_threshold_nudge` and CONTEXT.md's Step 2.
+- **Wizard state lives in one `ShowDraft` row's JSON blob, not normalized
+  draft tables.** Considered mirroring the real schema with DraftCategory/
+  DraftAward tables; rejected because a draft has no life beyond one
+  browser session — nothing ever queries, joins, or migrates against it,
+  and `materialize()` throws the whole row away the moment a real Show
+  exists. A blob that's read whole and reassigned whole (never mutated
+  in place — plain SQLAlchemy JSON columns don't track in-place dict
+  mutation, so every service function in `show_wizard.py` builds a new
+  dict and reassigns `draft.data`) is simpler and costs nothing extra
+  here. See `models/show_draft.py`.
+- **Wizard Steps 3 and 4 save every change immediately via small htmx
+  POSTs against the draft; Steps 1, 2, and the Step 3/4 "Continue"
+  actions are traditional submit-and-redirect.** The two "live" steps
+  manage variable-length lists (which categories are on, tie-break
+  order, which awards exist) where Max Score and the tie-break list both
+  need to reflect a toggle the instant it happens — deferring that to a
+  bulk save on Continue would mean either duplicating the recompute
+  logic client-side in JS or showing stale numbers until submit. Steps 1
+  and 2 are simple fixed fields with no live-recompute need, so a plain
+  form post is the more boring, more debuggable choice — matches
+  CONTEXT.md's resilience principle: no cleverness beyond what a given
+  screen actually needs.
+- **"Jump back and return" from Review uses a `from=review` query
+  parameter threaded through step links and continue actions, not
+  session state or a stored "furthest step."** Editing a section from
+  Review saves that step's data exactly like normal, then redirects to
+  Review instead of the next step in sequence — `from` never touches the
+  ShowDraft or carries business data, it's pure navigation context, so
+  it doesn't conflict with "keep wizard state server-side against a
+  draft, not in hidden form fields." Implemented as a query parameter
+  rather than a `Form(...)` field on the POST handlers — an earlier pass
+  wired it as a hidden form field and it silently did nothing, since a
+  value only present in the URL never reaches a `Form()`-declared
+  parameter; caught by `test_edit_from_review_returns_to_review`.
+- **`Award.active` was missing from the HB1 model rewrite — added now,
+  not deferred.** CONTEXT.md's Awards section says Show Awards are
+  "independently on/off," same as Judging Categories, but the HB1 award
+  model only got `judge_chosen`/`ranking_basis`/`winner_car_id` — an
+  oversight caught while building the wizard's Step 4, which needs
+  exactly this to represent an award the host turned off without
+  deleting it. Added via a normal incremental Alembic migration
+  (`674d2e0674cd`) on top of HB1's single clean baseline — going
+  forward, schema changes are ordinary migrations, not new baselines;
+  HB1's "one clean initial migration" was specific to that
+  reconciliation task, not a standing policy. That migration also makes
+  `Show.location` optional and adds `Show.notes`, both needed for the
+  wizard's Step 1 (Location was always required before; Notes didn't
+  exist). Note it needed hand-adjustment after `--autogenerate`: SQLite
+  has no native `ALTER COLUMN`, so the location-nullable change required
+  wrapping in `op.batch_alter_table`, which autogenerate doesn't add on
+  its own.
+- **Show creation is now the wizard's job exclusively —
+  `services/shows.py::create_show` was removed, not kept as a
+  fallback.** The old plain 3-field "New show" form is gone from
+  `shows/list.html`, replaced with a link to `/shows/new`. Keeping both
+  would mean two divergent ways to end up with a Show row — one with
+  entries/categories/awards, one without — for no benefit; nothing
+  needs the old path once the wizard exists. `services/shows.py` keeps
+  list/switch/edit, which the wizard doesn't do.
+- **The Show Dashboard's 8 named sections (CONTEXT.md: Overview, Cars,
+  Judging, Handhelds, Awards, Photos, Results, Edit Show) are a tab
+  strip (`components/macros.html::dashboard_tabs`), and the sidebar was
+  cut down to just Dashboard/Shows/Styleguide.** The old flat sidebar
+  (Cars, Judging Categories, Photos, Conflicts, Results, Awards) doesn't
+  match "exactly these sections" — Conflicts in particular isn't one of
+  the 8, so it dropped out of primary navigation entirely; the route
+  still exists (`/conflicts`, still a placeholder) and is reachable
+  directly, it's just not linked from anywhere until it has a real home.
+  Handhelds is a new real page (`/handhelds`, `web/handhelds.py`) — the
+  same data Overview's panel already shows, on its own for when the host
+  wants only that. Cars/Judging/Awards/Results keep their existing
+  placeholder content from HB1 (now under the tab strip, with updated
+  messages reflecting that Judging Setup happens in the wizard now) —
+  full post-creation editing of categories/awards was not asked for in
+  this task and was not built.
+- **The Overview dashboard's "Awards Needing a Winner" stat only counts
+  organiser-chosen (non-judge-chosen) awards with no `winner_car_id`
+  set.** A judge-chosen award's real readiness depends on nomination and
+  ranking logic (HB7) this build doesn't have — reporting a number for
+  those would be either a lie (always 0) or would require building HB7
+  early under a different name. Restricting the stat to what's
+  genuinely computable now (an organiser-chosen award is either decided
+  or it isn't) keeps it honest. "Cars Missing Photos" is fully real: a
+  judged car counts if it lacks a MATCHED photo of either required type.
 - **Major show-model overhaul (Aug 2026 spec update): no roster import, ever.**
   CSV/spreadsheet import is removed entirely — it will not be built. At show creation
   the organiser only states a car count; Home Base generates that many sequential

@@ -14,12 +14,18 @@ import pytest
 from sqlalchemy import select
 
 from app.models import Car, Handheld, JudgingCategory, JudgingScore, JudgingSubmission, Show, SubmissionStatus
-from app.services.shows import create_show, set_active_show
+from app.services.shows import set_active_show
 
 
 @pytest.fixture()
 def show_with_car(db_session):
-    show = create_show(db_session, name="Fall Cruise-In", event_date=date(2026, 9, 1), location="Field")
+    # services/shows.py no longer has create_show() — show creation moved
+    # to services/show_wizard.py's materialize() (see DECISIONS.md). This
+    # test is about sync, not the wizard, so it builds the Show directly
+    # rather than going through either creation path.
+    show = Show(name="Fall Cruise-In", event_date=date(2026, 9, 1), location="Field")
+    db_session.add(show)
+    db_session.commit()
     set_active_show(db_session, show.id)
     category = JudgingCategory(show_id=show.id, name="Engine", sort_order=1, active=True)
     db_session.add(category)

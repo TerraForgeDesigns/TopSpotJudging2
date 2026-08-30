@@ -1,10 +1,15 @@
 {% extends "base.html" %}
+{% import "components/macros.html" as c %}
 {% block title %}{{ title }} — Top Spot Judging{% endblock %}
 {% block content %}
 <div class="page-header">
   <span class="page-header__eyebrow">{{ eyebrow }}</span>
   <h1>{{ title }}</h1>
 </div>
+
+{% if active_show and tab %}
+{{ c.dashboard_tabs(active_show, tab) }}
+{% endif %}
 
 <div class="card empty-state">
   <div class="empty-state__icon">—</div>
