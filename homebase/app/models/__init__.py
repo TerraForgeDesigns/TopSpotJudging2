@@ -4,11 +4,19 @@ registry before any relationship() string reference is resolved, and so
 Alembic autogenerate sees the complete schema from a single import.
 """
 from app.models.app_settings import AppSettings
+from app.models.award import Award
 from app.models.base import Base
 from app.models.car import Car
 from app.models.car_class import CarClass
 from app.models.criteria import JudgingCriteria
-from app.models.enums import CarStatus, PhotoStatus, PhotoType, SubmissionStatus, TransferMethod
+from app.models.enums import (
+    AwardCategory,
+    CarStatus,
+    PhotoStatus,
+    PhotoType,
+    SubmissionStatus,
+    TransferMethod,
+)
 from app.models.handheld import Handheld
 from app.models.photo import Photo
 from app.models.show import Show
@@ -25,9 +33,11 @@ __all__ = [
     "JudgingScore",
     "Photo",
     "Handheld",
+    "Award",
     "CarStatus",
     "SubmissionStatus",
     "PhotoType",
     "PhotoStatus",
     "TransferMethod",
+    "AwardCategory",
 ]

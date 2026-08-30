@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Results — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Results</h1>
+  <div class="row" style="margin-top: var(--space-3);">
+    <a href="/results/export.csv" class="btn btn-secondary">Export CSV</a>
+    <a href="/results/print" class="btn btn-secondary" target="_blank">Printable view</a>
+  </div>
+</div>
+
+{% macro ranking_table(entries) %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width: 70px;">Rank</th>
+        <th>Reg #</th>
+        <th>Car</th>
+        <th>Class</th>
+        <th class="col-num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td class="col-num">
+          {{ entry.rank }}
+          {% if entry.tied %}<span class="pill pill--conflict" style="margin-left: var(--space-2);"><span class="pill__dot"></span>TIE — needs a decision</span>{% endif %}
+        </td>
+        <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.registration_number }}</td>
+        <td>{{ entry.car.year }} {{ entry.car.make }} {{ entry.car.model }}</td>
+        <td>{{ entry.car.car_class.name if entry.car.car_class else "Unclassified" }}</td>
+        <td class="col-num">{{ entry.score }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+<section class="section">
+  <h2 class="section__title">Overall rankings</h2>
+  {% if overall %}
+  {{ ranking_table(overall) }}
+  {% else %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">No scored cars yet</h3>
+    <p>Rankings appear here once at least one car has an accepted submission.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if class_groups %}
+<section class="section">
+  <h2 class="section__title">Rankings by class</h2>
+  <div class="stack" style="gap: var(--space-6);">
+    {% for car_class, entries in class_groups %}
+    <div>
+      <h3 style="margin-bottom: var(--space-3);">{{ car_class.name if car_class else "Unclassified" }}</h3>
+      {{ ranking_table(entries) }}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if criteria_boards %}
+<section class="section">
+  <h2 class="section__title">Per-criterion leaderboards</h2>
+  <p class="section__desc">Useful for category awards like "Best Paint."</p>
+  <div class="stack" style="gap: var(--space-6);">
+    {% for criterion, entries in criteria_boards %}
+    <div>
+      <h3 style="margin-bottom: var(--space-3);">{{ criterion.name }}</h3>
+      {{ ranking_table(entries) }}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

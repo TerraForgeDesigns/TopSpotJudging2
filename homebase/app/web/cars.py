@@ -3,9 +3,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.models import PhotoType
 from app.services import car_classes as car_classes_service
 from app.services import car_import as car_import_service
 from app.services import cars as cars_service
+from app.services.photo_ingest import get_car_photo
 from app.templating import templates
 from app.web.context import base_context, require_active_show
 
@@ -77,6 +79,7 @@ def edit_car(car_id: int, request: Request, duplicate: str | None = None, db: Se
     context["classes"] = [c for c, _ in car_classes_service.list_classes_with_counts(db, show.id)]
     context["judging_data"] = cars_service.judging_data_summary(db, car_id)
     context["duplicate"] = duplicate
+    context["judge_sheet_photo"] = get_car_photo(db, car_id, PhotoType.JUDGE_SHEET)
     return templates.TemplateResponse(request, "cars/edit.html", context)
 
 

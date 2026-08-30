@@ -1,0 +1,109 @@
+/*
+  print.css — the printable results view (results/print.html). Deliberately
+  NOT the dark screen theme: a full-bleed dark background wastes ink and
+  reads poorly on paper, so this is a plain light stylesheet reusing
+  DESIGN.md's type families but inverting the palette for print.
+*/
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 32px;
+  background: #FFFFFF;
+  color: #111318;
+  font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12pt;
+  line-height: 1.4;
+}
+
+h1, h2, h3 {
+  font-family: 'Archivo', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  color: #111318;
+  margin: 0 0 8px;
+}
+
+h1 { font-size: 22pt; }
+h2 { font-size: 15pt; margin-top: 28px; border-bottom: 2px solid #111318; padding-bottom: 4px; }
+h3 { font-size: 12.5pt; margin-top: 18px; }
+
+.eyebrow {
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #555A66;
+}
+
+.section {
+  break-inside: avoid-page;
+  margin-bottom: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  break-inside: auto;
+}
+
+tr {
+  break-inside: avoid;
+  break-after: auto;
+}
+
+thead {
+  display: table-header-group; /* repeat header on each printed page */
+}
+
+th, td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid #D0D3D9;
+  font-size: 10.5pt;
+}
+
+th {
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  font-size: 8.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555A66;
+  border-bottom: 2px solid #111318;
+}
+
+.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tie-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid #B3261E;
+  color: #B3261E;
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.print-footer {
+  margin-top: 24px;
+  font-size: 9pt;
+  color: #555A66;
+}
+
+@media print {
+  body {
+    padding: 0;
+  }
+
+  @page {
+    margin: 18mm 14mm;
+  }
+}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Awards — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Awards</h1>
+</div>
+
+<section class="section">
+  <h2 class="section__title">New award</h2>
+  <div class="card" style="max-width: 640px;">
+    <form method="post" action="/awards" class="stack">
+      {{ c.field("Award name", "name", placeholder="e.g. Best in Show") }}
+      <div class="field">
+        <label class="field__label" for="category">Category</label>
+        <select class="select" id="category" name="category" required>
+          <option value="overall">Overall (best total score across the show)</option>
+          <option value="criteria">Per-criterion (e.g. Best Paint)</option>
+          <option value="class">Per-class (e.g. Best in Class: Trucks)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="criteria_id">If per-criterion: which criterion</label>
+        <select class="select" id="criteria_id" name="criteria_id">
+          <option value="">—</option>
+          {% for criterion in criteria_list %}
+          <option value="{{ criterion.id }}">{{ criterion.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="class_id">If per-class: which class</label>
+        <select class="select" id="class_id" name="class_id">
+          <option value="">—</option>
+          {% for car_class in classes %}
+          <option value="{{ car_class.id }}">{{ car_class.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>{{ c.button("Add award", "primary", type="submit") }}</div>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  {% if awards %}
+  <div class="card-grid">
+    {% for award in awards %}
+    {% set suggestion = suggestions[award.id] %}
+    <div class="card">
+      <div class="card__header">
+        <h3 class="card__title">{{ award.name }}</h3>
+        <span class="mono-label">{{ award.category.value }}</span>
+      </div>
+
+      {% if award.winner_car %}
+      <p class="card__body">
+        <strong style="color: var(--text-primary);">{{ award.winner_car.registration_number }}</strong> —
+        {{ award.winner_car.year }} {{ award.winner_car.make }} {{ award.winner_car.model }}
+      </p>
+      {% elif suggestion.entry %}
+      <p class="card__body">
+        Suggested: <strong style="color: var(--text-primary);">{{ suggestion.entry.car.registration_number }}</strong>
+        — {{ suggestion.entry.car.year }} {{ suggestion.entry.car.make }} {{ suggestion.entry.car.model }}
+        ({{ suggestion.entry.score }} pts)
+      </p>
+      {% elif suggestion.ambiguous %}
+      <p class="card__body">{{ c.pill("Tie — needs a decision", "conflict") }}</p>
+      {% else %}
+      <p class="card__body">No scored cars yet for this award.</p>
+      {% endif %}
+
+      <form method="post" action="/awards/{{ award.id }}/winner" class="row" style="margin-top: var(--space-4); flex-wrap: nowrap;">
+        <select class="select" name="car_id" style="height: 36px;">
+          <option value="">{{ "Use suggestion" if suggestion.entry else "No winner set" }}</option>
+          {% for car in cars %}
+          <option value="{{ car.id }}"{{ ' selected' if award.winner_car_id == car.id }}>{{ car.registration_number }} — {{ car.year }} {{ car.make }} {{ car.model }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn--sm">Save</button>
+      </form>
+      <form method="post" action="/awards/{{ award.id }}/delete" style="margin-top: var(--space-3);">
+        <button type="submit" class="btn btn-destructive btn--sm">Delete award</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">No awards defined yet</h3>
+    <p>Add award slots above — winners are auto-suggested from the current results.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

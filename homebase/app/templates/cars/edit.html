@@ -16,7 +16,7 @@
 </div>
 {% endif %}
 
-<div class="card" style="max-width: 640px; margin-bottom: var(--space-8);">
+<div class="card" style="max-width: 760px; margin-bottom: var(--space-8);">
   <form method="post" action="/cars/{{ car.id }}" class="stack">
     {{ c.field("Registration number", "registration_number", value=car.registration_number) }}
     {{ c.field("Car number", "display_car_number", value=car.display_car_number) }}
@@ -38,8 +38,28 @@
       </select>
     </div>
     {{ c.field("Owner name", "owner_name", value=(car.owner_name or ""), required=False) }}
-    {{ c.field("Announcer name", "announcer_name", value=(car.announcer_name or ""), required=False,
-      hint="Read aloud during awards.") }}
+
+    <div class="row" style="align-items: flex-start; flex-wrap: nowrap;">
+      <div style="flex: 1;">
+        {{ c.field("Announcer name", "announcer_name", value=(car.announcer_name or ""), required=False,
+          hint="Read aloud during awards — type what's written on the judge sheet.") }}
+      </div>
+      <div style="width: 220px; flex-shrink: 0;">
+        <div class="field__label" style="margin-bottom: var(--space-2);">Judge sheet</div>
+        {% if judge_sheet_photo %}
+        <a href="/photo-files/{{ judge_sheet_photo.file_path }}" target="_blank">
+          <img class="photo-thumb photo-thumb--hero"
+               src="/photo-files/{{ judge_sheet_photo.thumbnail_path or judge_sheet_photo.file_path }}"
+               alt="Judge sheet for {{ car.registration_number }}">
+        </a>
+        {% else %}
+        <div class="photo-thumb photo-thumb--hero" style="display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: var(--text-xs); text-align: center; padding: var(--space-3);">
+          No judge sheet photo yet
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="row">
       {{ c.button("Save changes", "primary", type="submit") }}
       <a href="/cars" class="btn btn-secondary">Cancel</a>

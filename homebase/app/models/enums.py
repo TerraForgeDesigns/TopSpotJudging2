@@ -26,6 +26,12 @@ class PhotoType(str, enum.Enum):
     JUDGE_SHEET = "judge_sheet"
 
 
+class AwardCategory(str, enum.Enum):
+    OVERALL = "overall"  # e.g. Best in Show — ranked by total score across the whole show
+    CRITERIA = "criteria"  # e.g. Best Paint — ranked by a single criterion's score
+    CLASS = "class"  # e.g. Best in Class: Trucks — ranked by total score within one class
+
+
 class PhotoStatus(str, enum.Enum):
     MATCHED = "matched"  # normal case: resolved to a car, no conflict
     DUPLICATE = "duplicate"  # car+type slot was already filled — both kept, host resolves

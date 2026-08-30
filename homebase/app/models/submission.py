@@ -24,6 +24,10 @@ class JudgingSubmission(Base):
     registration_number: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     handheld_id: Mapped[int] = mapped_column(ForeignKey("handhelds.id"), nullable=False, index=True)
     judge_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Set when a host enters a corrected score set to resolve a conflict
+    # (services/conflicts.py) — the rationale for overriding what the
+    # judges actually submitted. Null for ordinary handheld submissions.
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     status: Mapped[SubmissionStatus] = mapped_column(

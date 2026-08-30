@@ -13,10 +13,10 @@
       <div class="stat-card__label"><span class="stat-card__dot"></span>Unjudged</div>
       <div class="stat-card__value">{{ summary.unjudged }}</div>
     </div>
-    <div class="stat-card stat-card--critical">
+    <a class="stat-card stat-card--critical" href="/conflicts" style="text-decoration: none; color: inherit;">
       <div class="stat-card__label"><span class="stat-card__dot"></span>Flagged Conflicts</div>
       <div class="stat-card__value">{{ summary.flagged_conflict }}</div>
-    </div>
+    </a>
   </div>
 
   {% if unmatched_count %}
@@ -28,7 +28,7 @@
       <p class="card__body">Scored under a registration number not in the current roster — a judge may
         have scored a car before it was registered here.</p>
     </div>
-    <a href="/submissions/unmatched" class="btn btn-destructive" style="flex-shrink: 0;">Reconcile</a>
+    <a href="/conflicts" class="btn btn-destructive" style="flex-shrink: 0;">Reconcile</a>
   </div>
   {% endif %}
 

@@ -251,6 +251,26 @@ def resolve_unmatched_photo(db: Session, photo_id: int, car_id: int) -> Photo:
     return photo
 
 
+def get_car_photo(db: Session, car_id: int, photo_type: PhotoType) -> Photo | None:
+    """The MATCHED photo of the given type for a car — e.g. the judge
+    sheet photo shown on the car edit page next to Announcer Name, since
+    that's where the registration number (and often the announcer's name)
+    is handwritten. Prefers MATCHED; falls back to the most recent
+    DUPLICATE if that's all there is, rather than showing nothing."""
+    matched = db.scalars(
+        select(Photo)
+        .where(Photo.car_id == car_id, Photo.photo_type == photo_type, Photo.status == PhotoStatus.MATCHED)
+        .order_by(Photo.transferred_at.desc())
+    ).first()
+    if matched is not None:
+        return matched
+    return db.scalars(
+        select(Photo)
+        .where(Photo.car_id == car_id, Photo.photo_type == photo_type, Photo.status == PhotoStatus.DUPLICATE)
+        .order_by(Photo.transferred_at.desc())
+    ).first()
+
+
 def list_unmatched_photos(db: Session, show_id: int) -> list[Photo]:
     return list(
         db.scalars(

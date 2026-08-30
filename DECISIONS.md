@@ -7,6 +7,39 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Standard competition ("1224") ranking, with every tie explicitly flagged.**
+  `services/scoring.py::rank_by_score` is the single function every ranking (overall,
+  per-class, per-criterion, and award suggestions) computes rank from. Equal scores
+  share a rank and the next distinct score jumps to `(position + 1)`, never silently
+  broken by insertion/id order. The tie-break OPEN item below is still unresolved — a
+  future rule plugs in as a secondary sort key *inside* this one function, so no
+  caller or template needs to change when it lands.
+- **Unscored cars are excluded from rankings entirely, not shown as 0-point entries.**
+  `services/scoring.py::list_scored_cars` only returns cars with an ACCEPTED
+  submission — a car nobody's judged yet has no meaningful score, and appearing as a
+  last-place 0 would misrepresent it as judged-and-bad rather than not-yet-judged.
+- **The unmatched-submissions view merged into `/conflicts`, replacing the standalone
+  `/submissions/unmatched` page from H3.** The conflict-resolution task explicitly
+  asked to surface that holding state on the same page as flagged-conflict cars, with
+  the assign/discard actions that page never had — rather than keep two separate
+  "things needing host attention" pages, `/conflicts` is now the one place for both.
+  The dashboard's unmatched-submissions banner and the Flagged Conflicts stat card
+  both link here now.
+- **Host-entered corrected submissions are attributed to a synthetic "Home Base (host
+  correction)" handheld**, created via the same `get_or_create_handheld` used for real
+  wire-protocol handhelds (services/sync.py) — reused rather than making
+  `JudgingSubmission.handheld_id` nullable for one edge case. `JudgingSubmission.note`
+  (new column) carries the host's rationale; visible wherever submissions are shown.
+- **Resolving a conflict (accept-one or enter-corrected) always rejects every other
+  competing submission on that car**, never deletes them — they stay queryable for
+  audit even though only one is ever ACCEPTED at a time.
+- **Award winners are stored (`Award.winner_car_id`), not computed live.** The
+  auto-suggestion re-runs the relevant ranking at display time and is shown until the
+  host explicitly saves an override (or the suggestion itself, to "lock it in") — a
+  tied rank-1 suggests nothing (`AwardSuggestion.ambiguous`) rather than silently
+  picking one. This is deliberately a separate concept from the live rankings: once
+  set, a winner doesn't quietly change if new scores come in later (e.g. a
+  post-ceremony conflict resolution), which matters for an award already announced.
 - **One shared `ingest_photo_file()` for both transports.** USB and WiFi both end up
   producing a source file that matches the `{registration_number}_car.jpg` /
   `_sheet.jpg` naming convention — the WiFi endpoint (`POST /api/v1/photos/upload`)
