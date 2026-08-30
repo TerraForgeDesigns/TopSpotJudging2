@@ -9,72 +9,107 @@ from pydantic import BaseModel, Field
 
 
 class ScoreIn(BaseModel):
-    criteria_name: str
+    category_id: int
     points: int
 
 
 class SubmissionIn(BaseModel):
-    registration_number: str
+    entry_number: str
     judge_name: str | None = None
-    closed_at: datetime
+    closed_at_uptime_ms: int
+    participant: str | None = None
+    year: str | None = None
+    make: str | None = None
+    model: str | None = None
+    vehicle_type: str | None = None
+    make_manually_entered: bool = False
+    model_manually_entered: bool = False
+    score_range_max: int  # REQUIRED — see PROTOCOL.md
     scores: list[ScoreIn] = Field(default_factory=list)
+    overall_impression: int | None = None
+    nominations: list[int] = Field(default_factory=list)  # award ids
 
 
-class SubmissionsRequest(BaseModel):
+class SyncRequest(BaseModel):
     handheld_id: str
-    since: datetime | None = None
+    config_revision: int
+    data_revision: int
+    battery_pct: int | None = None
     submissions: list[SubmissionIn] = Field(default_factory=list)
 
 
-class SummaryOut(BaseModel):
+class ResultItem(BaseModel):
+    entry_number: str
+    status: str  # "accepted" | "already_recorded" | "flagged_duplicate" | "error" — see PROTOCOL.md
+    message: str = ""
+
+
+class ProtocolSummary(BaseModel):
+    """Exactly the four fields PROTOCOL.md's `summary` object specifies —
+    owned by the wire contract, nothing more.
+
+    CHANGING THIS TYPE CHANGES THE FIRMWARE CONTRACT. It is deliberately
+    NOT the same type as services/dashboard.py's dashboard-facing summary
+    (DashboardSummary), even though today both are computed from the same
+    Car.status counts — see DECISIONS.md ("shared-by-coincidence types
+    are how wire contracts get broken silently"). If the Show Dashboard
+    needs a fifth stat tomorrow, DashboardSummary grows; this does not,
+    unless PROTOCOL.md itself changes.
+    """
+
     total_cars: int
     judged: int
     unjudged: int
     flagged_conflict: int
 
 
+class CategoryOut(BaseModel):
+    id: int
+    name: str
+    sort_order: int
+
+
+class NominationOptionOut(BaseModel):
+    """A judge-chosen Show Award, as far as a handheld needs to know
+    about it to offer it as a nomination checkbox. Winner-resolution
+    logic (ranking basis, tie cascade, etc.) is HB7's concern — this is
+    intentionally minimal."""
+
+    id: int
+    name: str
+
+
+class ConfigurationOut(BaseModel):
+    show_name: str
+    score_range_max: int
+    overall_impression_enabled: bool
+    categories: list[CategoryOut]
+    judge_chosen_awards: list[NominationOptionOut] = Field(default_factory=list)
+
+
 class CarOut(BaseModel):
     id: int
-    registration_number: str
-    display_car_number: str
-    make: str
-    model: str
-    year: int
-    class_name: str | None
+    entry_number: str
+    participant: str | None
+    year: str | None
+    make: str | None
+    model: str | None
+    vehicle_type: str | None
     status: str
-    updated_at: datetime
 
 
-class ClassOut(BaseModel):
-    id: int
-    name: str
-
-
-class CriteriaOut(BaseModel):
-    id: int
-    name: str
-    max_points: int
-
-
-class RosterResponse(BaseModel):
+class SyncResponse(BaseModel):
     server_time: datetime
+    config_revision: int
+    data_revision: int
+    configuration: ConfigurationOut | None
     cars: list[CarOut]
-    classes: list[ClassOut]
-    criteria: list[CriteriaOut]
-    summary: SummaryOut
-
-
-class ResultItem(BaseModel):
-    registration_number: str
-    status: str  # "accepted" | "flagged_duplicate" | "error" — see PROTOCOL.md
-    message: str = ""
-
-
-class SubmissionsResponse(BaseModel):
-    server_time: datetime
+    # Approved vehicle names — full semantics deferred to a not-yet-written
+    # spec referred to elsewhere as "SPEC-C". This field's presence in the
+    # contract is settled; its content is not. See PROTOCOL.md/DECISIONS.md.
+    vehicle_additions: list[dict] = Field(default_factory=list)
     results: list[ResultItem]
-    roster_delta: RosterResponse
-    summary: SummaryOut
+    summary: ProtocolSummary
 
 
 class HealthResponse(BaseModel):
