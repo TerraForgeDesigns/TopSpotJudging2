@@ -20,18 +20,6 @@ def list_shows(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request, "shows/list.html", context)
 
 
-@router.post("/shows")
-def create_show(
-    request: Request,
-    name: str = Form(...),
-    event_date: date = Form(...),
-    location: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    shows_service.create_show(db, name=name, event_date=event_date, location=location)
-    return RedirectResponse("/shows", status_code=303)
-
-
 @router.get("/shows/{show_id}/edit")
 def edit_show(show_id: int, request: Request, db: Session = Depends(get_db)):
     context = base_context(request, db, "/shows")
@@ -47,10 +35,11 @@ def update_show(
     show_id: int,
     name: str = Form(...),
     event_date: date = Form(...),
-    location: str = Form(...),
+    location: str = Form(""),
+    notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    shows_service.update_show(db, show_id, name=name, event_date=event_date, location=location)
+    shows_service.update_show(db, show_id, name=name, event_date=event_date, location=location, notes=notes)
     return RedirectResponse("/shows", status_code=303)
 
 

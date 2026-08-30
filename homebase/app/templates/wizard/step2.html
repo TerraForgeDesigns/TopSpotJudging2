@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Number of Cars — Create Show{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">Create Show</span>
+  <h1>Number of Cars</h1>
+</div>
+
+{{ c.step_indicator(draft.id, 2) }}
+
+<form method="post" action="/shows/new/{{ draft.id }}/step/2{{ '?from=review' if from_review }}" class="stack" style="max-width: 480px;">
+  <div class="field">
+    <label class="field__label" for="car_count">How many cars will be in the show?</label>
+    <input class="input{{ ' input--error' if errors.get('car_count') }}" id="car_count" name="car_count" type="number" min="1"
+      value="{{ car_count if car_count is not none else '' }}"
+      hx-get="/shows/new/{{ draft.id }}/step/2/preview" hx-target="#step2-preview" hx-swap="outerHTML"
+      hx-trigger="input changed delay:300ms">
+    {% if errors.get("car_count") %}<span class="field__error">{{ errors.car_count }}</span>{% endif %}
+    <span class="field__hint">
+      Entry numbers start at 001 and are created automatically. More cars can be added
+      later — this is not a limit.
+    </span>
+  </div>
+
+  {% include "wizard/_step2_preview.html" %}
+
+  <div class="row" style="margin-top: var(--space-4);">
+    <a href="/shows/new/{{ draft.id }}/step/1{{ '?from=review' if from_review }}" class="btn btn-secondary">Back</a>
+    {{ c.button("Continue" if not from_review else "Save & Return to Review", "primary", type="submit") }}
+  </div>
+</form>
+{% endblock %}

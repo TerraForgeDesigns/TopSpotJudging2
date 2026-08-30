@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Show Details — Create Show{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">Create Show</span>
+  <h1>Show Details</h1>
+</div>
+
+{{ c.step_indicator(draft.id, 1) }}
+
+<form method="post" action="/shows/new/{{ draft.id }}/step/1{{ '?from=review' if from_review }}" class="stack" style="max-width: 480px;">
+  {{ c.field("Show Name", "name", placeholder="e.g. Fall Cruise-In", value=values.name, error=errors.get("name", "")) }}
+  <div class="field">
+    <label class="field__label" for="event_date">Show Date</label>
+    <input class="input{{ ' input--error' if errors.get('event_date') }}" id="event_date" name="event_date" type="date" value="{{ values.event_date }}">
+    {% if errors.get("event_date") %}<span class="field__error">{{ errors.event_date }}</span>{% endif %}
+  </div>
+  {{ c.field("Location", "location", placeholder="e.g. Downtown Lot", value=values.location, required=False) }}
+  <div class="field">
+    <label class="field__label" for="notes">Notes</label>
+    <textarea class="textarea" id="notes" name="notes" placeholder="Optional notes about this show...">{{ values.notes }}</textarea>
+  </div>
+
+  <div class="row" style="margin-top: var(--space-4);">
+    <a href="/shows" class="btn btn-secondary">Cancel</a>
+    {{ c.button("Continue" if not from_review else "Save & Return to Review", "primary", type="submit") }}
+  </div>
+</form>
+{% endblock %}

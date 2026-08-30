@@ -18,3 +18,57 @@
   {% elif hint %}<span class="field__hint">{{ hint }}</span>{% endif %}
 </div>
 {% endmacro %}
+
+{% macro toggle(name, checked=False, extra_attrs="") %}
+<label class="toggle">
+  <input type="checkbox" name="{{ name }}"{{ ' checked' if checked }} {{ extra_attrs | safe }}>
+  <span class="toggle__track"></span>
+</label>
+{% endmacro %}
+
+{#
+  Create Show wizard step indicator. `current` is 1-6. Steps 1..current
+  are clickable (state for them is already saved, so jumping back is
+  always safe); steps beyond current are shown but not linked, since
+  they haven't been validated yet.
+#}
+{% macro step_indicator(draft_id, current) %}
+{% set labels = ["Show Details", "Number of Cars", "Judging Setup", "Awards", "Review", "Create Show"] %}
+<div class="wizard-steps">
+  {% for label in labels %}
+  {% set step_num = loop.index %}
+  {% if step_num < current %}
+  <a class="wizard-step is-done" href="/shows/new/{{ draft_id }}/step/{{ step_num }}">
+    <span class="wizard-step__num">✓</span>{{ label }}
+  </a>
+  {% elif step_num == current %}
+  <span class="wizard-step is-current">
+    <span class="wizard-step__num">{{ step_num }}</span>{{ label }}
+  </span>
+  {% else %}
+  <span class="wizard-step">
+    <span class="wizard-step__num">{{ step_num }}</span>{{ label }}
+  </span>
+  {% endif %}
+  {% if not loop.last %}<span class="wizard-connector"></span>{% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{#
+  Show Dashboard tab strip — exactly these 8 sections, per CONTEXT.md.
+  `active` is one of: overview, cars, judging, handhelds, awards,
+  photos, results, edit_show.
+#}
+{% macro dashboard_tabs(active_show, active) %}
+<nav class="dashboard-tabs">
+  <a class="dashboard-tab{{ ' is-active' if active == 'overview' }}" href="/">Overview</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'cars' }}" href="/cars">Cars</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'judging' }}" href="/criteria">Judging</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'handhelds' }}" href="/handhelds">Handhelds</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'awards' }}" href="/awards">Awards</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'photos' }}" href="/photos">Photos</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'results' }}" href="/results">Results</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'edit_show' }}" href="/shows/{{ active_show.id }}/edit">Edit Show</a>
+</nav>
+{% endmacro %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Awards — Create Show{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">Create Show</span>
+  <h1>Awards</h1>
+</div>
+
+{{ c.step_indicator(draft.id, 4) }}
+
+{% if error %}
+<div class="card card--danger" style="margin-bottom: var(--space-6); max-width: 560px;">
+  <p class="card__body" style="color: var(--red-500);">{{ error }}</p>
+</div>
+{% endif %}
+
+{% include "wizard/_step4_live.html" %}
+
+<form method="post" action="/shows/new/{{ draft.id }}/step/4/continue{{ '?from=review' if from_review }}">
+  <div class="row" style="margin-top: var(--space-4);">
+    <a href="/shows/new/{{ draft.id }}/step/3{{ '?from=review' if from_review }}" class="btn btn-secondary">Back</a>
+    {{ c.button("Continue" if not from_review else "Return to Review", "primary", type="submit") }}
+  </div>
+</form>
+{% endblock %}

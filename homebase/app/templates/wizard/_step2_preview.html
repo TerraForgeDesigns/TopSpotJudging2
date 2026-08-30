@@ -1,0 +1,10 @@
+<div id="step2-preview">
+  {% if has_count %}
+  <p style="color: var(--text-secondary);">Judges will score each category from 1 to {{ range_max }}.</p>
+  {% if nudge %}
+  <div class="card" style="border-color: var(--gold-500); max-width: 480px;">
+    <p class="card__body" style="color: var(--text-primary);">{{ nudge }}</p>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>

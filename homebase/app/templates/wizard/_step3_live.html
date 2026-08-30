@@ -1,0 +1,70 @@
+{% import "components/macros.html" as c %}
+<div id="step3-live">
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    {{ draft.data.car_count }} cars — judges will score each category from 1 to {{ range_max }}.
+  </p>
+
+  <section class="section">
+    <h2 class="section__title">What will the cars be judged on?</h2>
+    <div class="stack" style="max-width: 560px;">
+      {% for category in categories %}
+      <div class="card" style="padding: var(--space-4);">
+        <div class="row" style="justify-content: space-between; flex-wrap: nowrap;">
+          <div class="row" style="flex: 1; min-width: 0;">
+            {{ c.toggle(
+              "toggle_" ~ category.id, checked=category.active,
+              extra_attrs='hx-post="/shows/new/' ~ draft.id ~ '/step/3/category/' ~ category.id ~ '/toggle" hx-target="#step3-live" hx-swap="outerHTML" hx-trigger="change"'
+            ) }}
+            <input class="input" type="text" value="{{ category.name }}" style="max-width: 260px;"
+              hx-post="/shows/new/{{ draft.id }}/step/3/category/{{ category.id }}/rename"
+              hx-target="#step3-live" hx-swap="outerHTML" hx-trigger="change" name="name">
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="field__hint" style="margin-top: var(--space-3);">
+      These five are fixed — there's no way to add more, only turn them on or off and rename them.
+    </p>
+  </section>
+
+  <section class="section">
+    <div class="card" style="max-width: 320px; text-align: center;">
+      <div class="stat-card__label" style="justify-content: center;">Max Score</div>
+      <div class="stat-card__value" style="color: var(--gold-500);">{{ max_score }}</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section__title">If two cars tie, which category should decide?</h2>
+    <p class="section__desc">The first category listed is compared first, then the next, and so on.</p>
+    {% if active_categories %}
+    <div data-drag-list data-drag-order-input="priority-order-input" class="stack" style="max-width: 400px;">
+      {% for category in active_categories %}
+      <div class="card draggable-item row" draggable="true" data-drag-item data-drag-id="{{ category.id }}"
+        style="padding: var(--space-3) var(--space-4); justify-content: flex-start;">
+        <span class="drag-handle">⠿</span>
+        <span class="mono-label" style="text-transform:none; letter-spacing:0;">{{ loop.index }}.</span>
+        {{ category.name }}
+      </div>
+      {% endfor %}
+    </div>
+    <input type="hidden" id="priority-order-input" name="order"
+      hx-post="/shows/new/{{ draft.id }}/step/3/priority-order" hx-target="#step3-live" hx-swap="outerHTML" hx-trigger="change">
+    {% else %}
+    <p style="color: var(--text-secondary);">Turn on at least one Judging Category to set a tie-break order.</p>
+    {% endif %}
+  </section>
+
+  <section class="section">
+    <h2 class="section__title">Ask judges for an overall impression of each car?</h2>
+    <p class="section__desc">Used only to settle ties — it doesn't count toward a car's total or Max Score.</p>
+    <label class="row" style="cursor: pointer;">
+      {{ c.toggle(
+        "overall_impression", checked=overall_impression_enabled,
+        extra_attrs='hx-post="/shows/new/' ~ draft.id ~ '/step/3/overall-impression" hx-target="#step3-live" hx-swap="outerHTML" hx-trigger="change"'
+      ) }}
+      <span>{{ "On" if overall_impression_enabled else "Off" }}</span>
+    </label>
+  </section>
+</div>

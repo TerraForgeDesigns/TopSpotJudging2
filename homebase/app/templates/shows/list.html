@@ -11,22 +11,9 @@
   </p>
 </div>
 
-<section class="section">
-  <h2 class="section__title">New show</h2>
-  <div class="card" style="max-width: 640px;">
-    <form method="post" action="/shows" class="stack">
-      {{ c.field("Show name", "name", placeholder="e.g. Fall Cruise-In") }}
-      <div class="row" style="align-items: flex-start;">
-        <div class="field">
-          <label class="field__label" for="event_date">Event date</label>
-          <input class="input" id="event_date" name="event_date" type="date" required>
-        </div>
-        {{ c.field("Location", "location", placeholder="e.g. Downtown Lot") }}
-      </div>
-      <div>{{ c.button("Create show", "primary", type="submit") }}</div>
-    </form>
-  </div>
-</section>
+<div class="row" style="margin-bottom: var(--space-8);">
+  <a href="/shows/new" class="btn btn-primary">Create Show</a>
+</div>
 
 <section class="section">
   <h2 class="section__title">All shows</h2>
@@ -42,7 +29,7 @@
       </div>
       <div class="card__body stack">
         <div>{{ show.event_date.strftime('%b %d, %Y') }}</div>
-        <div>{{ show.location }}</div>
+        {% if show.location %}<div>{{ show.location }}</div>{% endif %}
       </div>
       <div class="row" style="margin-top: var(--space-5);">
         {% if not (active_show and active_show.id == show.id) %}

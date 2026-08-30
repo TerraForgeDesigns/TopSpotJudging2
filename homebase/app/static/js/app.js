@@ -58,6 +58,78 @@ document.addEventListener("change", (event) => {
   applyTableFilters(table);
 });
 
+// Generic drag-to-reorder — used by the Create Show wizard for the
+// tie-break category priority list and the Show Awards list. Native
+// HTML5 drag-and-drop, no library (matches the existing project
+// convention for reorderable lists — see DECISIONS.md).
+//
+// Markup contract:
+//   <div data-drag-list data-drag-order-input="some-id">
+//     <div data-drag-item data-drag-id="...">...</div>
+//     ...
+//   </div>
+//   <input type="hidden" id="some-id" name="order" ...>
+//
+// On drop, the container's children are reordered in the DOM and the
+// referenced hidden input's value becomes the new comma-separated
+// data-drag-id order, then a "change" event fires on it — an htmx
+// listener on that input (hx-trigger="change") is what actually
+// persists the new order server-side. This file only ever touches the
+// DOM and that one input; it has no opinion on what happens next.
+let draggedItem = null;
+
+document.addEventListener("dragstart", (event) => {
+  const item = event.target.closest("[data-drag-item]");
+  if (!item) return;
+  draggedItem = item;
+  item.classList.add("is-dragging");
+});
+
+document.addEventListener("dragend", (event) => {
+  const item = event.target.closest("[data-drag-item]");
+  if (item) item.classList.remove("is-dragging");
+  draggedItem = null;
+});
+
+document.addEventListener("dragover", (event) => {
+  const list = event.target.closest("[data-drag-list]");
+  if (!list || !draggedItem) return;
+  event.preventDefault();
+  const after = dragAfterElement(list, event.clientY);
+  if (after == null) {
+    list.appendChild(draggedItem);
+  } else {
+    list.insertBefore(draggedItem, after);
+  }
+});
+
+document.addEventListener("drop", (event) => {
+  const list = event.target.closest("[data-drag-list]");
+  if (!list || !draggedItem) return;
+  event.preventDefault();
+  const order = Array.from(list.querySelectorAll("[data-drag-item]")).map((el) => el.dataset.dragId);
+  const input = document.getElementById(list.dataset.dragOrderInput);
+  if (input) {
+    input.value = order.join(",");
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+});
+
+function dragAfterElement(list, y) {
+  const items = [...list.querySelectorAll("[data-drag-item]:not(.is-dragging)")];
+  return items.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null }
+  ).element;
+}
+
 function applyTableFilters(table) {
   const scope = table.dataset.filterTable;
   const controls = document.querySelectorAll(`[data-filter-for="${scope}"]`);

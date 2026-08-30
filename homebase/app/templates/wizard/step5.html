@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Review — Create Show{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">Create Show</span>
+  <h1>Review</h1>
+</div>
+
+{{ c.step_indicator(draft.id, 5) }}
+
+<div class="stack" style="max-width: 640px;">
+
+  <section class="card">
+    <div class="card__header">
+      <h3 class="card__title">Show</h3>
+      <a href="/shows/new/{{ draft.id }}/step/1?from=review" class="btn btn-secondary btn--sm">Edit</a>
+    </div>
+    <div class="card__body stack">
+      <div><strong style="color: var(--text-primary);">{{ draft.data.name }}</strong></div>
+      <div>{{ draft.data.event_date }}</div>
+      {% if draft.data.location %}<div>{{ draft.data.location }}</div>{% endif %}
+      {% if draft.data.notes %}<div>{{ draft.data.notes }}</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__header">
+      <h3 class="card__title">Cars</h3>
+      <a href="/shows/new/{{ draft.id }}/step/2?from=review" class="btn btn-secondary btn--sm">Edit</a>
+    </div>
+    <div class="card__body stack">
+      <div>Entries {{ entry_range }}</div>
+      <div>Judges will score each category from 1 to {{ range_max }}.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__header">
+      <h3 class="card__title">Judging</h3>
+      <a href="/shows/new/{{ draft.id }}/step/3?from=review" class="btn btn-secondary btn--sm">Edit</a>
+    </div>
+    <div class="card__body stack">
+      <div>
+        Judging categories, in tie-break order:
+        {{ active_categories | map(attribute="name") | join(", ") }}
+      </div>
+      <div>Max Score: <strong style="color: var(--gold-500);">{{ max_score }}</strong></div>
+      <div>Overall Impression: {{ "On — used to settle ties" if draft.data.overall_impression_enabled else "Off" }}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__header">
+      <h3 class="card__title">Awards</h3>
+      <a href="/shows/new/{{ draft.id }}/step/4?from=review" class="btn btn-secondary btn--sm">Edit</a>
+    </div>
+    <div class="card__body stack">
+      <div>Top {{ draft.data.top_awards_count }} — decided automatically from the final scores.</div>
+      {% if active_awards %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Award</th><th>Who picks</th></tr></thead>
+          <tbody>
+            {% for award in active_awards %}
+            <tr>
+              <td>{{ award.name }}</td>
+              <td>
+                {% if award.judge_chosen %}
+                Judges nominate — decided by {{ ranking_basis_labels.get(award.ranking_basis, award.ranking_basis) }}
+                {% else %}
+                You'll choose the winner
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div>No Show Awards — only Top Awards will be presented.</div>
+      {% endif %}
+    </div>
+  </section>
+
+</div>
+
+<form method="post" action="/shows/new/{{ draft.id }}/create">
+  <div class="row" style="margin-top: var(--space-6);">
+    <a href="/shows/new/{{ draft.id }}/step/4" class="btn btn-secondary">Back</a>
+    {{ c.button("Create Show", "primary", type="submit") }}
+  </div>
+</form>
+{% endblock %}
