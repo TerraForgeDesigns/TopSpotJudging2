@@ -473,6 +473,26 @@
 .pill--unjudged .pill__dot { background: var(--ink-400); }
 
 /* =========================================================
+   Draggable list items (awards reorder)
+   ========================================================= */
+
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item.is-dragging {
+  opacity: 0.4;
+}
+
+.drag-handle {
+  color: var(--ink-400);
+  font-size: var(--text-lg);
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* =========================================================
    Stat cards (dashboard)
    ========================================================= */
 

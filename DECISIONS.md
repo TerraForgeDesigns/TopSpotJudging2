@@ -7,6 +7,51 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Presentation mode is a standalone document (`awards/present.html`), not an app-shell
+  page with the sidebar hidden by CSS.** Zero app chrome ever enters the DOM, so there's
+  nothing to flash or hide — matches DESIGN.md's "no page flash" for a screen an
+  audience is watching. It links `tokens.css` + `base.css` (fonts, reset) +
+  `presentation.css` directly rather than extending `base.html`.
+- **All slides are server-rendered up front, in one page load; navigation only toggles
+  CSS classes.** `services/awards.py::build_presentation_sequence` resolves every
+  award's winner, photos, and score breakdown before the page ever reaches the
+  browser — there's no per-slide fetch, so "preload the next slide" is mostly free
+  (every `<img>` for every slide is already in the DOM from first paint, so the
+  browser fetches them all immediately regardless of which slide is active; the JS's
+  own `preloadAround()` is a defensive, idempotent no-op on top of that, not the real
+  mechanism). This is also what makes the crossfade a single `opacity` transition
+  with no loading state to hide.
+- **An award with no resolvable winner (nothing scored, or an unresolved tie) is
+  excluded from the presentation sequence entirely**, not shown broken. The Awards
+  page reports "`X of Y ready`" and disables Start Presentation at zero — the host
+  fixes it there, not mid-ceremony.
+- **Fullscreen requires a start screen with a real click.** The Fullscreen API only
+  grants a request inside a user-gesture handler, and navigating to `/awards/present`
+  from a link doesn't count as one on the new page — so the page opens on a
+  branded "Begin Presentation" button, whose click both requests fullscreen and
+  starts slide 1. This doubles as a natural "ready?" beat right before the ceremony
+  segment starts.
+- **Reveal-per-slide state persists for the rest of the session, but always starts
+  hidden the first time a slide is shown.** Going back to an already-revealed award
+  doesn't re-hide it — there's no reason to manufacture suspense for a car the host
+  already announced. Implemented as a plain `is-revealed` class toggle over a curtain
+  layer already sitting in the DOM (opacity crossfade only — no repositioning
+  animation), so "hidden behind the title until revealed" needed no JS-driven layout
+  changes.
+- **Escape's meaning is layered: close the judge-sheet overlay if it's open, else exit
+  fullscreen, else (or once fullscreen has already exited, including via the browser's
+  own native Escape handling) navigate back to `/awards`.** The `fullscreenchange`
+  listener catches both paths to the same "actually leave presentation mode" outcome.
+- **All presentation sizing uses `clamp()` against `vw`/`vh`, no fixed pixel values
+  and no resolution-specific breakpoints.** 1920x1080 and 1280x720 are both 16:9, so
+  proportional scaling from the same markup covers both; verified with real Playwright
+  screenshots at both resolutions (not just reasoning about the CSS) — see the
+  awards-presentation-mode session. No headless browser is wired into the test suite;
+  this was an ad hoc check, not an automated one.
+- **Award reorder uses native HTML5 drag-and-drop (`draggable`, no library), persisted
+  via a small `fetch()` POST to `/awards/reorder` on drop** — the task asked for drag
+  specifically (elsewhere in the app, Classes/Criteria reordering uses up/down buttons
+  instead; this is a deliberate exception, not a new default pattern).
 - **Standard competition ("1224") ranking, with every tie explicitly flagged.**
   `services/scoring.py::rank_by_score` is the single function every ranking (overall,
   per-class, per-criterion, and award suggestions) computes rank from. Equal scores

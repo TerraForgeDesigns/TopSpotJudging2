@@ -120,3 +120,61 @@ def test_suggestion_is_none_when_nothing_scored_yet(db_session):
 
     assert suggestion.entry is None
     assert suggestion.ambiguous is False
+
+
+# ---------------------------------------------------------------------------
+# Presentation sequence
+# ---------------------------------------------------------------------------
+
+
+def test_presentation_sequence_follows_sort_order_and_includes_scores(db_session):
+    show = _make_show(db_session)
+    paint = criteria_service.create_criteria(db_session, show.id, "Paint", 25)
+    engine = criteria_service.create_criteria(db_session, show.id, "Engine", 25)
+    winner = _make_car(db_session, show, "0001")
+    winner.announcer_name = "Jane Q. Owner"
+    db_session.commit()
+    _score(db_session, show, winner, {paint: 22, engine: 20}, "hh-1")
+
+    best_in_show = awards_service.create_award(db_session, show.id, "Best in Show", AwardCategory.OVERALL)
+    best_paint = awards_service.create_award(db_session, show.id, "Best Paint", AwardCategory.CRITERIA, criteria_id=paint.id)
+
+    slides = awards_service.build_presentation_sequence(db_session, show.id)
+
+    assert [s.award_name for s in slides] == ["Best in Show", "Best Paint"]
+    assert slides[0].registration_number == "0001"
+    assert slides[0].total_score == 42
+    assert slides[0].announcer_name == "Jane Q. Owner"
+    assert slides[0].scores == [("Paint", 22), ("Engine", 20)]
+    assert slides[0].car_photo_url is None  # no photo imported — placeholder handled client-side
+
+
+def test_presentation_sequence_excludes_awards_with_no_resolvable_winner(db_session):
+    show = _make_show(db_session)
+    paint = criteria_service.create_criteria(db_session, show.id, "Paint", 25)
+    a = _make_car(db_session, show, "0001")
+    b = _make_car(db_session, show, "0002")
+    _score(db_session, show, a, {paint: 25}, "hh-1")
+    _score(db_session, show, b, {paint: 25}, "hh-2")  # tie -> ambiguous, no suggestion
+
+    tied_award = awards_service.create_award(db_session, show.id, "Best in Show", AwardCategory.OVERALL)
+    awards_service.create_award(db_session, show.id, "Best Interior", AwardCategory.CRITERIA, criteria_id=999999)
+
+    slides = awards_service.build_presentation_sequence(db_session, show.id)
+
+    assert slides == []  # tied award has no unambiguous winner; the other has no scores at all
+
+
+def test_presentation_sequence_respects_explicit_reorder(db_session):
+    show = _make_show(db_session)
+    paint = criteria_service.create_criteria(db_session, show.id, "Paint", 25)
+    car = _make_car(db_session, show, "0001")
+    _score(db_session, show, car, {paint: 20}, "hh-1")
+
+    first = awards_service.create_award(db_session, show.id, "Best in Show", AwardCategory.OVERALL)
+    second = awards_service.create_award(db_session, show.id, "Best Paint", AwardCategory.CRITERIA, criteria_id=paint.id)
+
+    awards_service.reorder_awards(db_session, show.id, [second.id, first.id])
+
+    slides = awards_service.build_presentation_sequence(db_session, show.id)
+    assert [s.award_name for s in slides] == ["Best Paint", "Best in Show"]

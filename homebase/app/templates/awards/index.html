@@ -7,6 +7,25 @@
   <h1>Awards</h1>
 </div>
 
+<div class="card" style="margin-bottom: var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);">
+  <div>
+    <h3 class="card__title" style="margin-bottom: var(--space-1);">Presentation mode</h3>
+    <p class="card__body">
+      {% if presentable_count %}
+      {{ presentable_count }} of {{ awards|length }} award{{ "s" if awards|length != 1 }} ready to present.
+      {% if presentable_count < awards|length %}Awards with no scored cars or an unresolved tie are skipped.{% endif %}
+      {% else %}
+      No awards are ready yet — set a winner or score enough cars for a suggestion first.
+      {% endif %}
+    </p>
+  </div>
+  {% if presentable_count %}
+  <a href="/awards/present" target="_blank" class="btn btn-primary" style="flex-shrink: 0;">Start presentation</a>
+  {% else %}
+  <button type="button" class="btn btn-primary" disabled style="flex-shrink: 0;">Start presentation</button>
+  {% endif %}
+</div>
+
 <section class="section">
   <h2 class="section__title">New award</h2>
   <div class="card" style="max-width: 640px;">
@@ -44,48 +63,59 @@
 </section>
 
 <section class="section">
+  <h2 class="section__title">Award order</h2>
+  <p class="section__desc">Drag to set the sequence presentation mode walks through.</p>
   {% if awards %}
-  <div class="card-grid">
+  <ul id="award-list" class="stack" data-reorder-url="/awards/reorder" style="gap: var(--space-4);">
     {% for award in awards %}
     {% set suggestion = suggestions[award.id] %}
-    <div class="card">
-      <div class="card__header">
-        <h3 class="card__title">{{ award.name }}</h3>
-        <span class="mono-label">{{ award.category.value }}</span>
+    <li class="card draggable-item" draggable="true" data-award-id="{{ award.id }}">
+      <div class="row" style="justify-content: space-between; align-items: flex-start;">
+        <div class="row" style="gap: var(--space-3); align-items: flex-start;">
+          <span class="drag-handle">⠿⠿</span>
+          <div>
+            <div class="row" style="gap: var(--space-3);">
+              <h3 class="card__title">{{ award.name }}</h3>
+              <span class="mono-label">{{ award.category.value }}</span>
+            </div>
+
+            {% if award.winner_car %}
+            <p class="card__body" style="margin-top: var(--space-2);">
+              <strong style="color: var(--text-primary);">{{ award.winner_car.registration_number }}</strong> —
+              {{ award.winner_car.year }} {{ award.winner_car.make }} {{ award.winner_car.model }}
+            </p>
+            {% elif suggestion.entry %}
+            <p class="card__body" style="margin-top: var(--space-2);">
+              Suggested: <strong style="color: var(--text-primary);">{{ suggestion.entry.car.registration_number }}</strong>
+              — {{ suggestion.entry.car.year }} {{ suggestion.entry.car.make }} {{ suggestion.entry.car.model }}
+              ({{ suggestion.entry.score }} pts)
+            </p>
+            {% elif suggestion.ambiguous %}
+            <div style="margin-top: var(--space-2);">{{ c.pill("Tie — needs a decision", "conflict") }}</div>
+            {% else %}
+            <p class="card__body" style="margin-top: var(--space-2);">No scored cars yet for this award.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="stack" style="align-items: flex-end; flex-shrink: 0;">
+          <form method="post" action="/awards/{{ award.id }}/winner" class="row" style="flex-wrap: nowrap;">
+            <select class="select" name="car_id" style="height: 36px;">
+              <option value="">{{ "Use suggestion" if suggestion.entry else "No winner set" }}</option>
+              {% for car in cars %}
+              <option value="{{ car.id }}"{{ ' selected' if award.winner_car_id == car.id }}>{{ car.registration_number }} — {{ car.year }} {{ car.make }} {{ car.model }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary btn--sm">Save</button>
+          </form>
+          <form method="post" action="/awards/{{ award.id }}/delete">
+            <button type="submit" class="btn btn-destructive btn--sm">Delete</button>
+          </form>
+        </div>
       </div>
-
-      {% if award.winner_car %}
-      <p class="card__body">
-        <strong style="color: var(--text-primary);">{{ award.winner_car.registration_number }}</strong> —
-        {{ award.winner_car.year }} {{ award.winner_car.make }} {{ award.winner_car.model }}
-      </p>
-      {% elif suggestion.entry %}
-      <p class="card__body">
-        Suggested: <strong style="color: var(--text-primary);">{{ suggestion.entry.car.registration_number }}</strong>
-        — {{ suggestion.entry.car.year }} {{ suggestion.entry.car.make }} {{ suggestion.entry.car.model }}
-        ({{ suggestion.entry.score }} pts)
-      </p>
-      {% elif suggestion.ambiguous %}
-      <p class="card__body">{{ c.pill("Tie — needs a decision", "conflict") }}</p>
-      {% else %}
-      <p class="card__body">No scored cars yet for this award.</p>
-      {% endif %}
-
-      <form method="post" action="/awards/{{ award.id }}/winner" class="row" style="margin-top: var(--space-4); flex-wrap: nowrap;">
-        <select class="select" name="car_id" style="height: 36px;">
-          <option value="">{{ "Use suggestion" if suggestion.entry else "No winner set" }}</option>
-          {% for car in cars %}
-          <option value="{{ car.id }}"{{ ' selected' if award.winner_car_id == car.id }}>{{ car.registration_number }} — {{ car.year }} {{ car.make }} {{ car.model }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-secondary btn--sm">Save</button>
-      </form>
-      <form method="post" action="/awards/{{ award.id }}/delete" style="margin-top: var(--space-3);">
-        <button type="submit" class="btn btn-destructive btn--sm">Delete award</button>
-      </form>
-    </div>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
   {% else %}
   <div class="card empty-state">
     <div class="empty-state__icon">—</div>
@@ -94,4 +124,42 @@
   </div>
   {% endif %}
 </section>
+
+<script>
+(function () {
+  const list = document.getElementById('award-list');
+  if (!list) return;
+  let dragEl = null;
+
+  list.addEventListener('dragstart', (event) => {
+    dragEl = event.target.closest('.draggable-item');
+    if (dragEl) dragEl.classList.add('is-dragging');
+    event.dataTransfer.effectAllowed = 'move';
+  });
+
+  list.addEventListener('dragend', () => {
+    if (dragEl) dragEl.classList.remove('is-dragging');
+    dragEl = null;
+  });
+
+  list.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    const target = event.target.closest('.draggable-item');
+    if (!target || target === dragEl || !dragEl) return;
+    const rect = target.getBoundingClientRect();
+    const insertAfter = (event.clientY - rect.top) > rect.height / 2;
+    list.insertBefore(dragEl, insertAfter ? target.nextSibling : target);
+  });
+
+  list.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const order = Array.from(list.children).map((el) => parseInt(el.dataset.awardId, 10));
+    fetch(list.dataset.reorderUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: order }),
+    });
+  });
+})();
+</script>
 {% endblock %}

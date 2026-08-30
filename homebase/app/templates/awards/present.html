@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Awards — {{ active_show.name }}</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/presentation.css">
+</head>
+<body>
+  <div class="pres-root">
+
+    {% if not slides %}
+    <div class="pres-empty">
+      <div class="pres-empty__title">No awards ready to present</div>
+      <p class="pres-empty__body">Set a winner, or score enough cars for an unambiguous suggestion, before
+        starting the ceremony.</p>
+      <a class="pres-empty__link" href="/awards">Back to Awards</a>
+    </div>
+
+    {% else %}
+    <div class="pres-start">
+      <div class="pres-start__wordmark">Top Spot</div>
+      <div class="pres-start__sub">Judging</div>
+      <div class="pres-start__show">{{ active_show.name }} — Awards</div>
+      <button type="button" class="pres-start__button" data-pres-start>Begin Presentation</button>
+      <div class="pres-start__hint">→ / space to reveal &amp; advance · ← to go back · J for judge sheet · esc to exit</div>
+    </div>
+
+    <div class="pres-stage">
+      {% for slide in slides %}
+      <div class="pres-slide" data-index="{{ loop.index0 }}"
+           data-car-photo-url="{{ slide.car_photo_url or '' }}"
+           data-judge-sheet-url="{{ slide.judge_sheet_url or '' }}">
+
+        <div class="pres-slide__content">
+          <div class="pres-slide__hero">
+            {% if slide.car_photo_url %}
+            <img src="{{ slide.car_photo_url }}" alt="{{ slide.year }} {{ slide.make }} {{ slide.model }}">
+            {% else %}
+            <div class="pres-placeholder">
+              <div class="pres-placeholder__number">{{ slide.display_car_number }}</div>
+              <div class="pres-placeholder__label">Photo not available</div>
+            </div>
+            {% endif %}
+            <div class="pres-slide__hero-gradient"></div>
+          </div>
+
+          <div class="pres-slide__panel">
+            <div class="pres-slide__award-name">{{ slide.award_name }}</div>
+            <div class="pres-slide__car-number">#{{ slide.display_car_number }}</div>
+            <div class="pres-slide__car-details">{{ slide.year }} {{ slide.make }} {{ slide.model }}</div>
+            {% if slide.announcer_name %}
+            <div class="pres-slide__announcer"><strong>{{ slide.announcer_name }}</strong></div>
+            {% endif %}
+            <div class="pres-slide__total"><span class="pres-slide__total-label">Total</span>{{ slide.total_score }}</div>
+
+            {% if slide.scores %}
+            <div class="pres-scorelist">
+              {% for name, points in slide.scores %}
+              <div class="pres-scorelist__row">
+                <span class="pres-scorelist__name">{{ name }}</span>
+                <span class="pres-scorelist__points">{{ points }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="pres-curtain">
+          <div class="pres-curtain__eyebrow">Top Spot Judging</div>
+          <div class="pres-curtain__title">{{ slide.award_name }}</div>
+          <div class="pres-curtain__hint">Press → to reveal</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="pres-controls">
+      <button type="button" class="pres-nav-btn" data-pres-prev aria-label="Previous award" disabled>&larr;</button>
+      <div class="pres-progress">
+        <span data-pres-progress-text>1 / {{ slides|length }}</span>
+        <div class="pres-progress__dots">
+          {% for slide in slides %}
+          <span class="pres-progress__dot{{ ' is-current' if loop.first }}"></span>
+          {% endfor %}
+        </div>
+      </div>
+      <button type="button" class="pres-nav-btn" data-pres-next aria-label="Next award">&rarr;</button>
+    </div>
+
+    <div class="pres-sheet-overlay">
+      <img src="" alt="Judge sheet">
+      <div class="pres-sheet-overlay__hint">Press J to close</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <script src="/static/js/presentation.js"></script>
+</body>
+</html>

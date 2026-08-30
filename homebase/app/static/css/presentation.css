@@ -1,0 +1,464 @@
+/*
+  presentation.css — full-screen awards ceremony display. See DESIGN.md
+  "Awards presentation mode": cinematic and dark, large hero photo, gold
+  accents, huge legible type, crossfade only (no slide-in animation).
+  Sizing is clamp()-based throughout so the identical markup scales
+  correctly from 1280x720 projectors up through 1920x1080 without any
+  breakpoints — both are the same 16:9 aspect ratio.
+*/
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink-900);
+}
+
+.pres-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: var(--ink-900);
+  cursor: default;
+}
+
+/* ---- Start screen (fullscreen requires a user gesture) ---- */
+
+.pres-start {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 2.2vh, 28px);
+  background: var(--ink-900);
+  transition: opacity 300ms ease;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.pres-start.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pres-start__wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--gold-500);
+  font-size: clamp(28px, 4vw, 56px);
+  letter-spacing: -0.02em;
+}
+
+.pres-start__sub {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+  font-size: clamp(11px, 1.1vw, 15px);
+}
+
+.pres-start__show {
+  color: var(--text-primary);
+  font-size: clamp(14px, 1.3vw, 18px);
+  margin-top: clamp(4px, 1vh, 10px);
+}
+
+.pres-start__button {
+  margin-top: clamp(16px, 3vh, 32px);
+  padding: 0 clamp(24px, 3vw, 48px);
+  height: clamp(48px, 6vh, 72px);
+  border-radius: 8px;
+  background: var(--gold-500);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(16px, 1.8vw, 24px);
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.pres-start__button:hover { background: var(--gold-400); }
+
+.pres-start__hint {
+  color: var(--text-secondary);
+  font-size: clamp(11px, 1vw, 14px);
+}
+
+/* ---- Slide stack (all slides rendered up front, crossfade via opacity) ---- */
+
+.pres-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.pres-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease;
+}
+
+.pres-slide.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.pres-slide__content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 58% 42%;
+}
+
+.pres-slide__hero {
+  position: relative;
+  background: var(--ink-800);
+  overflow: hidden;
+}
+
+.pres-slide__hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pres-slide__hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 65%, var(--ink-900) 100%);
+  pointer-events: none;
+}
+
+.pres-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 42%, var(--ink-700), var(--ink-800));
+}
+
+.pres-placeholder__number {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(72px, 15vw, 240px);
+  color: rgba(245, 165, 36, 0.16);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pres-placeholder__label {
+  position: absolute;
+  bottom: clamp(24px, 5vh, 56px);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: clamp(11px, 1vw, 14px);
+  color: var(--text-secondary);
+}
+
+.pres-slide__panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(24px, 4vw, 64px);
+  gap: clamp(10px, 1.6vh, 20px);
+  background: var(--ink-900);
+  overflow: hidden;
+}
+
+.pres-slide__award-name {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--gold-500);
+  font-size: clamp(13px, 1.3vw, 19px);
+}
+
+.pres-slide__car-number {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--gold-500);
+  font-size: clamp(38px, 6.5vw, 100px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pres-slide__car-details {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: clamp(18px, 2.4vw, 36px);
+  line-height: 1.15;
+}
+
+.pres-slide__announcer {
+  font-size: clamp(13px, 1.3vw, 20px);
+  color: var(--text-secondary);
+}
+
+.pres-slide__announcer strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.pres-slide__total {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--text-primary);
+  font-size: clamp(22px, 2.8vw, 40px);
+  font-variant-numeric: tabular-nums;
+}
+
+.pres-slide__total-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: clamp(10px, 0.9vw, 13px);
+  color: var(--text-secondary);
+  margin-right: 10px;
+}
+
+.pres-scorelist {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 0.5vh, 8px);
+  margin-top: clamp(2px, 0.6vh, 8px);
+  max-height: 32vh;
+  overflow: hidden;
+}
+
+.pres-scorelist__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: clamp(3px, 0.5vh, 7px);
+  border-bottom: 1px solid var(--ink-600);
+  font-size: clamp(13px, 1.2vw, 19px);
+}
+
+.pres-scorelist__name {
+  color: var(--text-secondary);
+}
+
+.pres-scorelist__points {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ---- Reveal curtain: hides everything but the award title ---- */
+
+.pres-curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 2.5vh, 28px);
+  background: var(--ink-900);
+  opacity: 1;
+  transition: opacity 250ms ease;
+  text-align: center;
+  padding: 0 clamp(24px, 6vw, 96px);
+}
+
+.pres-slide.is-revealed .pres-curtain {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pres-curtain__eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+  font-size: clamp(12px, 1.2vw, 17px);
+}
+
+.pres-curtain__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--gold-500);
+  font-size: clamp(34px, 6.2vw, 92px);
+  line-height: 1.05;
+}
+
+.pres-curtain__hint {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  font-size: clamp(11px, 1vw, 15px);
+  opacity: 0.55;
+  animation: pres-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes pres-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
+/* ---- Bottom controls: auto-hide, reappear on mouse movement ---- */
+
+.pres-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(14px, 3vh, 32px) clamp(20px, 3vw, 48px);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(14, 17, 22, 0.85), transparent);
+}
+
+.pres-root.controls-visible .pres-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pres-nav-btn {
+  width: clamp(40px, 4vw, 56px);
+  height: clamp(40px, 4vw, 56px);
+  border-radius: 50%;
+  border: 1px solid var(--ink-600);
+  background: rgba(23, 27, 34, 0.85);
+  color: var(--text-primary);
+  font-size: clamp(18px, 1.8vw, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.pres-nav-btn:hover {
+  background: var(--ink-700);
+  border-color: var(--gold-500);
+}
+
+.pres-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pres-progress {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.2vw, 14px);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-size: clamp(12px, 1vw, 15px);
+  letter-spacing: 0.06em;
+}
+
+.pres-progress__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.pres-progress__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-600);
+  transition: background 150ms ease;
+}
+
+.pres-progress__dot.is-current { background: var(--gold-500); }
+.pres-progress__dot.is-done { background: var(--text-secondary); }
+
+/* ---- Judge sheet overlay ---- */
+
+.pres-sheet-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(14, 17, 22, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  padding: clamp(24px, 6vh, 72px);
+}
+
+.pres-sheet-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pres-sheet-overlay img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--ink-600);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pres-sheet-overlay__hint {
+  position: absolute;
+  bottom: clamp(16px, 3vh, 32px);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: clamp(11px, 1vw, 14px);
+  color: var(--text-secondary);
+}
+
+/* ---- Empty state (no presentable awards) ---- */
+
+.pres-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.pres-empty__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: clamp(20px, 2.5vw, 32px);
+}
+
+.pres-empty__body {
+  color: var(--text-secondary);
+  font-size: clamp(13px, 1.2vw, 17px);
+  max-width: 48ch;
+}
+
+.pres-empty__link {
+  margin-top: 8px;
+  color: var(--gold-500);
+  font-weight: 600;
+  text-decoration: underline;
+}
