@@ -633,6 +633,62 @@ building on top of it. Newest entries at the top of each section.
 - **Scan-first sync with backoff.** Full trigger/backoff model in PROTOCOL.md.
 - **PC clock is the time authority; handhelds sync clock from `server_time`.** No NTP,
   ever — see CONTEXT.md offline-first constraint.
+- **HB7 — Scoring, tie-breaking, conflicts, results, awards, finish show (this
+  task):**
+  1. **`JudgingCategory.built_in_key` added** — a stable identity string ("engine",
+     "exterior", "interior", "paint", "wheels_tires") set once at show creation by
+     `services/show_wizard.py::materialize()`, never touched by a rename. Discovered
+     while building `award_results.py`: `Award.ranking_basis` needs to reliably find
+     "the Engine category" even after an organiser renames it to "Motor," and matching
+     by `name` would silently break the moment that happens. `name` is what's shown;
+     `built_in_key` is what code matches on. Nullable, so pre-existing dev data
+     degrades to "not usable as a ranking basis" instead of failing to load.
+  2. **Top Awards boundary-tie resolution is stored as a set of car ids
+     (`Show.top_awards_resolved_car_ids`), not a recomputed placement list.**
+     `services/results.py::compute_top_awards()` is a pure function over an already-
+     ranked list — it always distinguishes "the tied group exactly fills the
+     remaining slots" (no real choice, resolved automatically) from "more cars are
+     tied than there's room for" (CONTEXT.md's "4 cars are tied for the last 2
+     places" case), and only the second case ever needs storage. The ranking itself
+     is never cached — recomputed fresh every time, same as everywhere else in this
+     codebase.
+  3. **`Award.marked_not_presented` is a separate boolean from "no winner set yet,"**
+     mutually exclusive with `winner_car_id` (setting one clears the other via
+     `award_results.py::choose_winner`/`mark_not_presented`). Needed because
+     `services/finish_show.py`'s gate must be able to tell "this award still needs a
+     decision" apart from "this award was decided not to happen this year" —
+     collapsing them into one nullable `winner_car_id` would make a genuinely
+     unresolved award indistinguishable from a deliberately skipped one.
+  4. **Award winners are suggested live, never auto-applied.** Reapplies the same
+     principle DECISIONS.md already recorded for the pre-Aug-2026 awards model:
+     `award_results.py::suggest_award_winner()` computes the highest-ranked nominee
+     on every call and returns `ambiguous=True` with no entry if rank 1 is itself a
+     tie; only an explicit host action (`use_suggested_winner()` or `choose_winner()`)
+     ever writes `Award.winner_car_id`. A tied suggestion is never silently broken by
+     database id or insertion order.
+  5. **`services/finish_show.py`'s gate treats a judge-chosen award with zero
+     nominations as outstanding, worded differently from "has nominees but no
+     confirmed winner."** CONTEXT.md calls this out by name — a Show Award nobody
+     nominated anyone for is easy to forget entirely, not just easy to leave
+     undecided. An inactive award (`Award.active is False`) is never outstanding; it
+     was never going to be presented.
+  6. **Finishing a show does not bump either revision counter.** Unlike every other
+     Show Setup or car-data change, `ShowStatus.JUDGING -> FINISHED` doesn't change
+     anything a handheld's sync response needs to reflect — see
+     `services/revisions.py`'s docstring for what each counter is actually for.
+  7. **The Awards dashboard tab now points at `/awards` (winner resolution: nominee
+     lists, Choose Winner, mark-not-presented, Finish Show), not Edit Show's award
+     SLOT setup (`#awards-setup` — add/rename/reorder/toggle/change who picks).**
+     HB3 originally routed the tab into Edit Show because winner resolution didn't
+     exist yet; now that it does, setup and resolution are different enough tasks
+     (configuring award slots vs. deciding who won) to warrant separate pages. Slot
+     setup stays reachable via a link from the Awards page.
+  8. **The printable Results view (`/results/print`) is a standalone HTML document
+     that doesn't extend `base.html` and inlines its own CSS**, rather than reusing
+     the app shell — CONTEXT.md asks for a print view that "works offline with sane
+     page breaks," and a page with zero dependency on the app's own static assets or
+     JS is the simplest way to guarantee that, independent of whether home base's own
+     server is reachable when it's printed.
 
 ## Open
 

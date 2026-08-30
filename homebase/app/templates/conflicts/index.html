@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Conflicts — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Conflicts</h1>
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    A car ends up here when two handhelds both produced a scoring result for the same
+    entry. Nothing is guessed automatically — pick which scores to keep, or enter a
+    corrected set by hand.
+  </p>
+</div>
+
+{{ c.dashboard_tabs(active_show, "judging") }}
+
+{% if cars %}
+<div class="stack">
+  {% for car in cars %}
+  <div class="card">
+    <div class="row" style="justify-content: space-between;">
+      <div>
+        <h3 class="card__title">Car {{ car.entry_number }} was judged twice. Choose which scores to keep.</h3>
+        <p class="card__body">
+          {{ (car.participant or "—") }} — {{ car.year or "" }} {{ car.make or "" }} {{ car.model or "" }}
+        </p>
+      </div>
+      <a class="btn btn-primary" href="/conflicts/{{ car.id }}">Review</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">No conflicts</h3>
+  <p>Every judged car has exactly one accepted set of scores.</p>
+</div>
+{% endif %}
+{% endblock %}

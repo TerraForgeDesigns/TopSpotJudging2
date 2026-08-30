@@ -24,6 +24,18 @@ class JudgingCategory(Base):
     `updated_at` either — sync no longer compares per-row timestamps, see
     Show.configuration_revision.
 
+    `built_in_key` is the category's STABLE identity ("engine", "paint",
+    etc. — the same strings services/show_wizard.py's BUILTIN_CATEGORIES
+    and models.enums.AwardRankingBasis use), set once at show creation and
+    never changed even if the organiser renames the category. Without it,
+    an Award whose ranking_basis is ENGINE would have no reliable way to
+    find "the Engine category" once it's been renamed to "Motor" — a
+    silently wrong award winner, not a real one. `name` is what's shown
+    to judges and the organiser; `built_in_key` is what code matches on.
+    Nullable only so a row created before this field existed (dev data)
+    degrades to "not usable as an award ranking basis" instead of failing
+    to load — see services/award_results.py.
+
     (Previously named JudgingCriteria — renamed to match LANGUAGE.md.)
     """
 
@@ -32,6 +44,7 @@ class JudgingCategory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     show_id: Mapped[int] = mapped_column(ForeignKey("shows.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    built_in_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

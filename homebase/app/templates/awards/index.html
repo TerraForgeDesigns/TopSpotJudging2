@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Awards — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Awards</h1>
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    Choose winners here. Adding, renaming, or reordering award slots is done from
+    <a href="/shows/{{ active_show.id }}/edit#awards-setup">Edit Show</a>.
+  </p>
+</div>
+
+{{ c.dashboard_tabs(active_show, "awards") }}
+
+{% if nomination_report %}
+<section class="card" style="margin-bottom: var(--space-6);">
+  <h2 class="card__title" style="margin-bottom: var(--space-3);">Nominations per Judge</h2>
+  <p class="card__body">Judges nominate at very different rates — a generous judge gives their cars more chances.</p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Judge</th><th class="col-num">Cars Judged</th><th class="col-num">Nominations Made</th><th class="col-num">Rate</th></tr></thead>
+      <tbody>
+        {% for stat in nomination_report %}
+        <tr>
+          <td>{{ stat.handheld_label }}</td>
+          <td class="col-num">{{ stat.cars_judged }}</td>
+          <td class="col-num">{{ stat.nominations_made }}</td>
+          <td class="col-num">{{ "%.0f"|format(stat.rate * 100) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if award_views %}
+<div class="stack" style="gap: var(--space-6);">
+  {% for view in award_views %}
+  {% set award = view.award %}
+  <section class="card" id="award-{{ award.id }}">
+    <div class="row" style="justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h2 class="card__title">{{ award.name }}</h2>
+        <p class="field__hint">
+          {{ "Judges nominate" if award.judge_chosen else "You choose" }}{{ " — " ~ view.basis_label if view.basis_label }}
+        </p>
+      </div>
+      {% if award.marked_not_presented %}
+      {{ c.pill("Will not be presented", "unjudged") }}
+      {% elif award.winner_car_id %}
+      {{ c.pill("Winner chosen", "judged") }}
+      {% else %}
+      {{ c.pill("Needs a decision", "conflict") }}
+      {% endif %}
+    </div>
+
+    {% if award.judge_chosen %}
+      {% if view.nominees %}
+      <div class="table-wrap" style="margin-top: var(--space-4);">
+        <table class="table">
+          <thead><tr><th>Rank</th><th>Entry #</th><th>Participant</th><th class="col-num">{{ view.basis_label or "Score" }}</th></tr></thead>
+          <tbody>
+            {% for entry in view.nominees %}
+            <tr{{ ' style="font-weight: 600;"' if award.winner_car_id == entry.car.id }}>
+              <td>{{ entry.rank }}{% if entry.tied %} <span class="field__hint">(tied)</span>{% endif %}</td>
+              <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.entry_number }}</td>
+              <td>{{ entry.car.participant or "—" }}</td>
+              <td class="col-num">{{ entry.key[0] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if view.suggestion and view.suggestion.entry and award.winner_car_id != view.suggestion.entry.car.id %}
+      <form method="post" action="/awards/{{ award.id }}/use-suggested" style="margin-top: var(--space-3);">
+        <p class="field__hint" style="margin-bottom: var(--space-2);">
+          Suggested winner: Car {{ view.suggestion.entry.car.entry_number }} ({{ view.suggestion.entry.car.participant or "—" }}), the highest-ranked nominee.
+        </p>
+        {{ c.button("Use this winner", "secondary", type="submit", size="sm") }}
+      </form>
+      {% elif view.suggestion and view.suggestion.ambiguous %}
+      <p class="field__hint" style="margin-top: var(--space-3); color: var(--red-500);">The nominated cars are tied. Choose which one wins below.</p>
+      {% endif %}
+
+      {% if view.high_scorers %}
+      <p class="field__hint" style="margin-top: var(--space-3);">
+        {{ view.high_scorers|length }} car{{ "s" if view.high_scorers|length != 1 }} scored as well as the {{ "leading nominee" if view.nominees else "field" }}
+        in {{ view.basis_label or "this category" }} but {{ "were" if view.high_scorers|length != 1 else "was" }} not nominated for {{ award.name }}:
+        {% for car, score in view.high_scorers %}{{ car.entry_number }} ({{ score }}){{ ", " if not loop.last }}{% endfor %}.
+      </p>
+      {% endif %}
+
+      <form method="post" action="/awards/{{ award.id }}/choose-winner" class="row" style="margin-top: var(--space-4); align-items: flex-end;">
+        <div class="field" style="max-width: 280px;">
+          <label class="field__label" for="winner_{{ award.id }}">Choose winner</label>
+          <select class="select" id="winner_{{ award.id }}" name="car_id">
+            <option value="">No winner</option>
+            {% for entry in view.nominees %}
+            <option value="{{ entry.car.id }}" {{ "selected" if award.winner_car_id == entry.car.id }}>
+              {{ entry.car.entry_number }} — {{ entry.car.participant or "—" }} ({{ entry.key[0] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {{ c.button("Save", "primary", type="submit", size="sm") }}
+      </form>
+    {% else %}
+      <form method="post" action="/awards/{{ award.id }}/choose-winner" class="row" style="margin-top: var(--space-4); align-items: flex-end;">
+        <div class="field" style="max-width: 280px;">
+          <label class="field__label" for="winner_{{ award.id }}">Choose winner</label>
+          <select class="select" id="winner_{{ award.id }}" name="car_id">
+            <option value="">No winner</option>
+            {% for car in cars %}
+            <option value="{{ car.id }}" {{ "selected" if award.winner_car_id == car.id }}>
+              {{ car.entry_number }} — {{ car.participant or "—" }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {{ c.button("Save", "primary", type="submit", size="sm") }}
+      </form>
+    {% endif %}
+
+    {% if award.winner_car_id and award.winner_car %}
+    <div class="row" style="margin-top: var(--space-5); align-items: flex-start; gap: var(--space-4);">
+      {% set photo = winner_photos.get(award.id) %}
+      {% if photo %}
+      <img class="photo-thumb" src="/photo-files/{{ photo.thumbnail_path or photo.file_path }}" alt="Judge sheet for {{ award.winner_car.entry_number }}">
+      {% endif %}
+      <form method="post" action="/awards/announcer-name" class="field" style="max-width: 260px;">
+        <input type="hidden" name="car_id" value="{{ award.winner_car_id }}">
+        <label class="field__label" for="announcer_{{ award.id }}">Announcer name — Car {{ award.winner_car.entry_number }}</label>
+        <input class="input" id="announcer_{{ award.id }}" name="name" type="text" value="{{ award.winner_car.announcer_name or '' }}"
+          placeholder="Name to read aloud">
+        {{ c.button("Save name", "secondary", type="submit", size="sm") }}
+      </form>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/awards/{{ award.id }}/not-presented" style="margin-top: var(--space-4);">
+      <input type="hidden" name="flag" value="{{ 'no' if award.marked_not_presented else 'yes' }}">
+      {{ c.button("Mark as presented" if award.marked_not_presented else "Mark as will not be presented", "secondary", type="submit", size="sm") }}
+    </form>
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">No active awards</h3>
+  <p>Add award slots from <a href="/shows/{{ active_show.id }}/edit#awards-setup">Edit Show</a> first.</p>
+</div>
+{% endif %}
+
+<section class="card" style="margin-top: var(--space-8); max-width: 560px;">
+  <h2 class="card__title" style="margin-bottom: var(--space-3);">Finish Show</h2>
+  {% if outstanding %}
+  <p class="card__body">Every award needs a winner or a "will not be presented" mark before the show can finish:</p>
+  <ul class="stack" style="gap: var(--space-2);">
+    {% for item in outstanding %}
+    <li><a href="#award-{{ item.award.id }}">{{ item.reason }}</a></li>
+    {% endfor %}
+  </ul>
+  {{ c.button("Finish Show", "primary", disabled=True) }}
+  {% else %}
+  <p class="card__body">Every award has a winner or is marked as not presented. This show is ready to finish.</p>
+  <form method="post" action="/shows/{{ active_show.id }}/finish">
+    {{ c.button("Finish Show", "primary", type="submit") }}
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

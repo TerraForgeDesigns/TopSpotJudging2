@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Results — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Results</h1>
+</div>
+
+{{ c.dashboard_tabs(active_show, "results") }}
+
+<div class="row" style="margin-bottom: var(--space-6); gap: var(--space-3);">
+  <a class="btn btn-secondary" href="/results/print" target="_blank">Printable view</a>
+  <a class="btn btn-secondary" href="/results/export.csv">Export CSV</a>
+</div>
+
+{% if active_show.top_awards_count %}
+<section class="card" style="margin-bottom: var(--space-6);">
+  <h2 class="card__title" style="margin-bottom: var(--space-3);">Top {{ active_show.top_awards_count }}</h2>
+
+  {% if top_awards.tied_group and not top_awards.resolved %}
+  <p class="card__body" style="color: var(--red-500);">
+    {{ top_awards.tied_group|length }} cars are tied for the last {{ top_awards.slots_remaining }}
+    place{{ "s" if top_awards.slots_remaining != 1 }} in the Top {{ active_show.top_awards_count }}.
+    Choose which cars place.
+  </p>
+  <form method="post" action="/results/top-awards/resolve" class="stack">
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th></th><th>Entry #</th><th>Participant</th><th class="col-num">Total</th></tr></thead>
+        <tbody>
+          {% for entry in top_awards.tied_group %}
+          <tr>
+            <td><input type="checkbox" name="car_ids" value="{{ entry.car.id }}"></td>
+            <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.entry_number }}</td>
+            <td>{{ entry.car.participant or "—" }}</td>
+            <td class="col-num">{{ entry.key[0] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="field__hint">Choose exactly {{ top_awards.slots_remaining }} to fill the remaining place{{ "s" if top_awards.slots_remaining != 1 }}.</p>
+    <div>{{ c.button("Save placement", "primary", type="submit") }}</div>
+  </form>
+  {% elif top_awards.tied_group %}
+  <p class="card__body">
+    The tie for the last place{{ "s" if top_awards.slots_remaining != 1 }} has been resolved by the host.
+  </p>
+  {% else %}
+  <p class="card__body">No boundary tie — the Top {{ active_show.top_awards_count }} is unambiguous.</p>
+  {% endif %}
+
+  {% if top_awards.resolved %}
+  <div class="table-wrap table-wrap--scroll">
+    <table class="table">
+      <thead><tr><th>Rank</th><th>Entry #</th><th>Participant</th><th class="col-num">Total</th></tr></thead>
+      <tbody>
+        {% for entry in top_awards.placed %}
+        <tr>
+          <td>{{ entry.rank }}{% if entry.tied %} <span class="field__hint">(tied)</span>{% endif %}</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.entry_number }}</td>
+          <td>{{ entry.car.participant or "—" }}</td>
+          <td class="col-num">{{ entry.key[0] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section style="margin-bottom: var(--space-8);">
+  <h2 style="margin-bottom: var(--space-3);">Full Rankings</h2>
+  {% if ranked %}
+  <div class="table-wrap table-wrap--scroll">
+    <table class="table">
+      <thead><tr><th>Rank</th><th>Entry #</th><th>Participant</th><th class="col-num">Total</th></tr></thead>
+      <tbody>
+        {% for entry in ranked %}
+        <tr>
+          <td>{{ entry.rank }}{% if entry.tied %} <span class="field__hint">(tied)</span>{% endif %}</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.entry_number }}</td>
+          <td>{{ entry.car.participant or "—" }}</td>
+          <td class="col-num">{{ entry.key[0] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">No scored cars yet</h3>
+    <p>Rankings appear once at least one car has an accepted set of scores.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if leaderboards %}
+<section>
+  <h2 style="margin-bottom: var(--space-3);">Category Leaderboards</h2>
+  <div class="card-grid">
+    {% for category, entries in leaderboards %}
+    <div class="card">
+      <h3 class="card__title" style="margin-bottom: var(--space-3);">{{ category.name }}{{ " (inactive)" if not category.active }}</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Rank</th><th>Entry #</th><th class="col-num">Score</th></tr></thead>
+          <tbody>
+            {% for entry in entries %}
+            <tr>
+              <td>{{ entry.rank }}</td>
+              <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ entry.car.entry_number }}</td>
+              <td class="col-num">{{ entry.key[0] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -44,6 +44,11 @@ class Award(Base):
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     winner_car_id: Mapped[int | None] = mapped_column(ForeignKey("cars.id"), nullable=True)
+    # Distinct from "no winner set yet" (needs a decision before finish —
+    # see services/finish_show.py) — this is an explicit host decision that
+    # this award simply isn't happening this year. Never inferred, never
+    # defaulted to True.
+    marked_not_presented: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     show: Mapped["Show"] = relationship()

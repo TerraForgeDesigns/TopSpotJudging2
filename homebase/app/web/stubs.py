@@ -1,10 +1,11 @@
 """
 Placeholder routes for Show Dashboard sections not yet rebuilt — see
-DECISIONS.md. Cars, Judging (category setup), and Awards (setup) are no
-longer here: Cars is a real page (web/cars.py); Judging Setup and Awards
-management now live under Edit Show (web/shows.py) — see the dashboard
-tab strip in components/macros.html. What's left is genuinely
-unbuilt: conflict resolution and results/rankings display.
+DECISIONS.md. Cars, Judging (category setup), Awards (setup), Conflicts,
+and Results are no longer here: Cars is a real page (web/cars.py);
+Judging Setup and Awards management live under Edit Show (web/shows.py);
+Conflicts (web/conflicts.py), Results (web/results.py), and Awards
+winner resolution (web/awards.py) are real pages too — see the dashboard
+tab strip in components/macros.html. Nothing is currently stubbed.
 """
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
@@ -16,24 +17,7 @@ from app.web.context import base_context, require_active_show
 
 router = APIRouter()
 
-_STUBS = {
-    "/conflicts": (
-        "Conflicts",
-        "Judging",
-        "judging",
-        "Conflict resolution is being rebuilt for the new submission model. "
-        "Flagged-conflict cars are still recorded correctly when two handhelds "
-        "score the same entry; there's just no screen to resolve them yet.",
-    ),
-    "/results": (
-        "Results",
-        "Judging",
-        "results",
-        "Results and rankings now use the new tie-break cascade and adjusted "
-        "scores (see CONTEXT.md); the display, export, and print views that "
-        "consume them haven't been rebuilt yet.",
-    ),
-}
+_STUBS: dict = {}
 
 
 def _stub(path: str, title: str, eyebrow: str, tab: str, message: str):

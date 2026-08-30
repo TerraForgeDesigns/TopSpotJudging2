@@ -391,6 +391,7 @@ def materialize(db: Session, draft: ShowDraft) -> Show:
             JudgingCategory(
                 show_id=show.id,
                 name=category["name"],
+                built_in_key=category["id"],
                 active=category["active"],
                 sort_order=category["sort_order"],
             )

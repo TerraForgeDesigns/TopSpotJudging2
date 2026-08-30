@@ -60,12 +60,18 @@
   `active` is one of: overview, cars, judging, handhelds, awards,
   photos, results, edit_show.
 
-  Judging and Awards both point into Edit Show's sections (Judging Setup,
-  Awards), not separate pages — see this task's "EDIT SHOW, grouped by
-  what the organiser is trying to do" instruction and DECISIONS.md.
-  Visiting either always shows "Edit Show" as the active tab, since
-  that's genuinely which page you're on — there's no scroll-position
-  tracking here, just a same-page anchor jump.
+  Judging points into Edit Show's Judging Setup section (category on/off,
+  score range) — see this task's "EDIT SHOW, grouped by what the organiser
+  is trying to do" instruction and DECISIONS.md. Visiting it shows
+  "Edit Show" as the active tab, since that's genuinely which page you're
+  on — there's no scroll-position tracking here, just a same-page anchor
+  jump.
+
+  Awards points at the real award-resolution page (/awards — nominees,
+  Choose Winner, mark-not-presented), not Edit Show's award SLOT setup
+  (add/rename/reorder award names). Slot setup is still reachable from
+  Edit Show directly; this tab is about resolving winners once judging
+  has produced nominees.
 #}
 {% macro dashboard_tabs(active_show, active) %}
 <nav class="dashboard-tabs">
@@ -73,7 +79,7 @@
   <a class="dashboard-tab{{ ' is-active' if active == 'cars' }}" href="/cars">Cars</a>
   <a class="dashboard-tab{{ ' is-active' if active == 'judging' }}" href="/shows/{{ active_show.id }}/edit#judging-setup">Judging</a>
   <a class="dashboard-tab{{ ' is-active' if active == 'handhelds' }}" href="/handhelds">Handhelds</a>
-  <a class="dashboard-tab{{ ' is-active' if active == 'awards' }}" href="/shows/{{ active_show.id }}/edit#awards-setup">Awards</a>
+  <a class="dashboard-tab{{ ' is-active' if active == 'awards' }}" href="/awards">Awards</a>
   <a class="dashboard-tab{{ ' is-active' if active == 'photos' }}" href="/photos">Photos</a>
   <a class="dashboard-tab{{ ' is-active' if active == 'results' }}" href="/results">Results</a>
   <a class="dashboard-tab{{ ' is-active' if active == 'edit_show' }}" href="/shows/{{ active_show.id }}/edit">Edit Show</a>

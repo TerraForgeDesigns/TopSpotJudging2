@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, utcnow
@@ -39,10 +39,16 @@ class Show(Base):
     score_range_max: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     overall_impression_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # One of 10/20/50/100/150/200, or None if the organiser hasn't set
-    # Top Awards up yet — see CONTEXT.md's Awards section. Auto-computed
-    # winners (who's actually in the top N) are HB7's concern; this is
-    # just the organiser's chosen count.
+    # Top Awards up yet — see CONTEXT.md's Awards section.
     top_awards_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The host's explicit choice among cars TIED at the Top Awards boundary
+    # (e.g. "4 cars tied for the last 2 places — pick 2") — see
+    # services/results.py::compute_top_awards. None when no boundary tie
+    # has ever needed resolving. Holds car ids, not a count — a boundary
+    # tie can only be resolved by naming exactly which cars placed, and
+    # this is the one part of Top Awards that isn't purely computed from
+    # rankings, so it's the one part that needs storage.
+    top_awards_resolved_car_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
 
     configuration_revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     show_data_revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

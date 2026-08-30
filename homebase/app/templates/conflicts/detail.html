@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Car {{ view.car.entry_number }} Conflict — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Car {{ view.car.entry_number }} was judged twice. Choose which scores to keep.</h1>
+  <p style="color: var(--text-secondary);">
+    {{ (view.car.participant or "—") }} — {{ view.car.year or "" }} {{ view.car.make or "" }} {{ view.car.model or "" }}
+  </p>
+</div>
+
+<div class="table-wrap table-wrap--scroll" style="margin-bottom: var(--space-6);">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Category</th>
+        {% for row in view.rows %}
+        <th>
+          {{ row.submission.judge_name or "Judge not recorded" }}<br>
+          <span class="field__hint">{{ row.submission.handheld.label }} — {{ row.submission.closed_at.strftime('%b %d, %I:%M %p') }}</span>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for category in view.categories %}
+      <tr>
+        <td>{{ category.name }}</td>
+        {% for row in view.rows %}
+        <td class="col-num">{{ row.scores_by_category_id.get(category.id, "—") }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <tr>
+        <td><strong>Total</strong></td>
+        {% for row in view.rows %}
+        <td class="col-num"><strong>{{ row.total }}</strong></td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td>Status</td>
+        {% for row in view.rows %}
+        <td>
+          {% if row.submission.status.value == "accepted" %}
+          {{ c.pill("Currently accepted", "judged") }}
+          {% elif row.submission.status.value == "rejected" %}
+          {{ c.pill("Rejected", "unjudged") }}
+          {% else %}
+          {{ c.pill("Flagged duplicate", "conflict") }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td></td>
+        {% for row in view.rows %}
+        <td>
+          <form method="post" action="/conflicts/{{ view.car.id }}/accept">
+            <input type="hidden" name="submission_id" value="{{ row.submission.id }}">
+            {{ c.button("Keep this set", "primary" if row.submission.status.value != "accepted" else "secondary", type="submit", size="sm") }}
+          </form>
+        </td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="max-width: 480px;">
+  <h3 class="card__title" style="margin-bottom: var(--space-2);">Enter a corrected set instead</h3>
+  <p class="card__body">Use this if neither judge sheet was transcribed correctly.</p>
+  {% if correction_error %}<p class="field__error" style="margin-bottom: var(--space-3);">{{ correction_error }}</p>{% endif %}
+  <form method="post" action="/conflicts/{{ view.car.id }}/correct" class="stack">
+    {% for category in view.categories %}
+    <div class="field">
+      <label class="field__label" for="score_{{ category.id }}">{{ category.name }} (1–{{ active_show.score_range_max }})</label>
+      <input class="input{{ ' input--error' if score_errors and score_errors.get(category.id) }}"
+        id="score_{{ category.id }}" name="score_{{ category.id }}" type="number" min="1" max="{{ active_show.score_range_max }}">
+      {% if score_errors and score_errors.get(category.id) %}<span class="field__error">{{ score_errors[category.id] }}</span>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="field">
+      <label class="field__label" for="note">Note</label>
+      <input class="input" id="note" name="note" type="text" placeholder="e.g. Re-checked the paper sheet">
+    </div>
+    <div>{{ c.button("Save corrected scores", "secondary", type="submit") }}</div>
+  </form>
+</div>
+
+<p style="margin-top: var(--space-6);"><a href="/conflicts">&larr; Back to Conflicts</a></p>
+{% endblock %}
