@@ -23,12 +23,15 @@ from app.services.revisions import bump_configuration_revision
 from app.services.score_conversion import convert_score
 
 # CONTEXT.md: 1-150 -> 1-5, 151-300 -> 1-10, 301+ -> 1-25 (open-ended).
-_TIER_THRESHOLDS = [(150, 5), (300, 10)]
+# Public (not _-prefixed): the Number of Cars wizard step reuses these same
+# threshold values for its near-threshold nudge — see web/show_wizard.py —
+# rather than re-declaring 150/300 as separate magic numbers there.
+TIER_THRESHOLDS = [(150, 5), (300, 10)]
 _TOP_TIER_MAX = 25
 
 
 def range_max_for_car_count(car_count: int) -> int:
-    for threshold, range_max in _TIER_THRESHOLDS:
+    for threshold, range_max in TIER_THRESHOLDS:
         if car_count <= threshold:
             return range_max
     return _TOP_TIER_MAX

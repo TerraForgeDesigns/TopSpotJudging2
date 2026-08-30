@@ -34,6 +34,10 @@ class Award(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     show_id: Mapped[int] = mapped_column(ForeignKey("shows.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Independently on/off, like a JudgingCategory — an award turned off
+    # stays in the show (rename/reorder/re-enable all still work) rather
+    # than being deleted outright. See CONTEXT.md's Awards section.
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     judge_chosen: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     ranking_basis: Mapped[AwardRankingBasis | None] = mapped_column(
         Enum(AwardRankingBasis, native_enum=False, validate_strings=True, length=16), nullable=True

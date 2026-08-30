@@ -21,6 +21,7 @@ from app.models.enums import (
 from app.models.handheld import Handheld
 from app.models.photo import Photo
 from app.models.show import Show
+from app.models.show_draft import ShowDraft
 from app.models.submission import JudgingScore, JudgingSubmission
 from app.models.vehicle import VehicleCandidate, VehicleCandidateSighting, VehicleMake, VehicleModel
 
@@ -28,6 +29,7 @@ __all__ = [
     "Base",
     "AppSettings",
     "Show",
+    "ShowDraft",
     "Car",
     "JudgingCategory",
     "JudgingSubmission",

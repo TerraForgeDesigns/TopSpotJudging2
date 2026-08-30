@@ -25,7 +25,8 @@ class Show(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     event_date: Mapped[date] = mapped_column(Date, nullable=False)
-    location: Mapped[str] = mapped_column(String(200), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     score_range_max: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
