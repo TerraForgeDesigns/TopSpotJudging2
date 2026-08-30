@@ -1,0 +1,20 @@
+# Pinned dependencies for Top Spot Judging — home base.
+# Install once, while internet is available:
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements.txt   (Windows)
+#   .venv/bin/pip install -r requirements.txt        (macOS/Linux)
+# The venv is never rebuilt from the network again at the event — see /README.md.
+
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn[standard]==0.52.4
+SQLAlchemy==2.0.52
+alembic==1.19.1
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+python-multipart==0.0.32
+pydantic==2.13.5
+
+# dev / test
+pytest==9.1.1
+httpx==0.28.1

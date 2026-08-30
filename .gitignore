@@ -11,6 +11,12 @@ env/
 dist/
 build/
 
+.pytest_cache/
+
+# Runtime data (generated at run time, never committed)
+homebase/data/*
+!homebase/data/.gitkeep
+
 # PlatformIO
 .pio/
 .pioenvs/

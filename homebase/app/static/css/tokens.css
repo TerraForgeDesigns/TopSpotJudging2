@@ -1,0 +1,71 @@
+/*
+  tokens.css — Top Spot Judging design tokens.
+  Source of truth: /DESIGN.md. Change values there first, then here.
+*/
+
+:root {
+  /* ---- Color: ink scale (surfaces) ---- */
+  --ink-900: #0E1116; /* app background, deepest */
+  --ink-800: #171B22; /* card / panel surface */
+  --ink-700: #1F242D; /* raised surface, inputs */
+  --ink-600: #2A313C; /* borders, dividers */
+  --ink-400: #667085; /* disabled text, subtle icons ONLY — fails AA for body copy */
+
+  /* ---- Color: text ---- */
+  --text-primary: #F2F4F7;
+  --text-secondary: #98A2B3;
+  --text-on-gold: #0E1116; /* the only text color permitted on a gold fill */
+
+  /* ---- Color: brand (primary action ONLY — never status) ---- */
+  --gold-500: #F5A524;
+  --gold-400: #FFB84D; /* hover/active state of gold */
+  --gold-glow: rgba(245, 165, 36, 0.15);
+
+  /* ---- Color: status (never used for brand/primary action) ---- */
+  --green-500: #12B76A; /* judged, synced, success */
+  --blue-500: #2E90FA;  /* pending sync, informational */
+  --red-500: #F04438;   /* conflict, error, unjudged-critical */
+
+  /* ---- Spacing (8px grid) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 8px;  /* buttons, inputs */
+  --radius-md: 12px; /* cards */
+  --radius-pill: 999px; /* status pills, chips */
+
+  /* ---- Type families ---- */
+  --font-display: 'Archivo', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* ---- Type scale: 11/13/16/20/24/32/52/64 ---- */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 52px;
+  --text-4xl: 64px;
+
+  --mono-label-tracking: 0.14em;
+
+  /* ---- Motion ---- */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease; /* awards-mode crossfade ceiling */
+
+  /* ---- Shadow ---- */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-focus: 0 0 0 3px var(--gold-glow);
+}

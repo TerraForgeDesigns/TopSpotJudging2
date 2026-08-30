@@ -1,0 +1,20 @@
+{# Reusable component macros. Keep markup here so feature pages don't
+   reinvent button/input/pill markup — see /DESIGN.md for the rules these encode. #}
+
+{% macro button(label, variant="primary", type="button", disabled=False, size="") %}
+<button type="{{ type }}" class="btn btn-{{ variant }}{{ ' btn--' + size if size }}"{{ ' disabled' if disabled }}>{{ label }}</button>
+{% endmacro %}
+
+{% macro pill(label, status) %}
+<span class="pill pill--{{ status }}"><span class="pill__dot"></span>{{ label }}</span>
+{% endmacro %}
+
+{% macro field(label, name, type="text", placeholder="", hint="", error="", disabled=False) %}
+<div class="field">
+  <label class="field__label" for="{{ name }}">{{ label }}</label>
+  <input class="input{{ ' input--error' if error }}" id="{{ name }}" name="{{ name }}" type="{{ type }}"
+    placeholder="{{ placeholder }}"{{ ' disabled' if disabled }}>
+  {% if error %}<span class="field__error">{{ error }}</span>
+  {% elif hint %}<span class="field__hint">{{ hint }}</span>{% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Top Spot Judging{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="wordmark">
+        <span class="wordmark__mark">Top Spot</span>
+      </div>
+      <div class="wordmark" style="margin-top: -12px;">
+        <span class="wordmark__sub">Judging</span>
+      </div>
+
+      <nav class="nav">
+        {% for item in nav_items %}
+          {% if item.enabled %}
+          <a class="nav-link{{ ' is-active' if item.path == active_path else '' }}" href="{{ item.path }}">
+            {{ item.label }}
+          </a>
+          {% else %}
+          <span class="nav-link is-disabled">
+            {{ item.label }}
+            <span class="nav-link__badge">Soon</span>
+          </span>
+          {% endif %}
+        {% endfor %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-widget">
+          {% if connection_status == "no_show_loaded" %}
+          <div class="status-widget__row">
+            <span class="pill pill--unjudged"><span class="pill__dot"></span>No Show Loaded</span>
+          </div>
+          <div class="status-widget__row">Set up a show to begin judging.</div>
+          {% else %}
+          <div class="status-widget__row">
+            <span class="pill pill--judged"><span class="pill__dot"></span>Home Base Online</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="/static/js/htmx.min.js"></script>
+  <script src="/static/js/app.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>
