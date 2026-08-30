@@ -7,6 +7,51 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Handheld hardware contract locked in (F1 — hardware bring-up):** Elecrow CrowPanel
+  ESP32 Display 7" (DIS08070H V3.0), ESP32-S3-WROOM-1-N4R8, 800x480 RGB parallel LCD
+  (not SPI TFT), GT911 capacitive touch over I2C, onboard microSD, Arducam Mega 5MP
+  SPI on a second dedicated SPI bus using repurposed UART0 (GPIO43/44) and I2S BCLK
+  (GPIO42) pins, plus GPIO38 for camera CS. Full pin table with sourcing lives in
+  `firmware/include/pins.h` — every pin was verified against Elecrow's own wiki and
+  two independent working example sketches from the community reference repo Elecrow
+  points users to for this board, not guessed. This resolves the "exact touchscreen
+  and Arducam part numbers" item that was blocking firmware work (see old entry
+  below, now superseded).
+- **The Arducam Mega library (v3.0.0) always uses the global Arduino `SPI` object —
+  it cannot be pointed at a separate `SPIClass` instance.** Read directly from the
+  vendor source (`ArducamSpi.cpp`): its HAL calls bare `SPI.begin()`/`SPI.transfer()`
+  with no pin arguments. Since the SD card is wired to genuinely separate GPIOs, using
+  the SD library's default `SD.begin(cs)` — which *also* defaults to that same global
+  `SPI` object — would have silently coupled camera and SD in software regardless of
+  physical wiring. Fix: the camera gets the global `SPI` object, pre-configured with
+  its own pins before `Arducam_Mega::begin()` runs (ESP32's `SPIClass::begin()` is a
+  verified no-op on a second call, confirmed by reading `arduino-esp32`'s own
+  `SPI.cpp`); the SD card gets its own independent `SPIClass(HSPI)` instance, passed
+  explicitly via `SD.begin(cs, sdSPI, ...)` (confirmed against `arduino-esp32`'s
+  `SD.h` signature). See `firmware/src/camera/camera.cpp` and
+  `firmware/src/storage/sd_card.cpp`.
+- **Arducam Mega's internal `waitI2cIdle()` has no timeout — it's a bare `while(...) ;`
+  busy-wait**, confirmed by reading `ArducamCamera.c`. A missing or unresponsive
+  camera can hang `begin()` or a capture forever, not just fail — worse than a crash,
+  since it would freeze the whole single-threaded firmware during setup. Fix: every
+  call into the library runs on an isolated FreeRTOS task; the caller polls with its
+  own timeout and forcibly `vTaskDelete()`s the task if it doesn't finish in time,
+  reporting the camera unavailable rather than propagating the hang. See
+  `firmware/src/camera/camera.h`'s header comment for the full rationale.
+- **Arducam Mega pinned via its GitHub tag (`ArduCAM/Arducam_Mega#v3.0.0`), not the
+  PlatformIO registry.** The registry has no listing under the official vendor's own
+  name — only a third-party mirror (`dennis-ard/Arducam_Mega`) at an older version
+  (2.0.9). Pinning directly against the vendor's tag is both more current and more
+  trustworthy than depending on an unofficial mirror staying in sync.
+- **Firmware bring-up code is verified by actually compiling it (`pio run`), not just
+  reviewed.** PlatformIO isn't installed system-wide in this environment, so it was
+  installed into the project's Python venv and all four environments
+  (`bringup-display`, `bringup-sd`, `bringup-camera`, `handheld`) were built to a
+  successful link — this caught four real compile errors (a missing `<cstddef>`, a
+  missing `driver/i2c.h` include the reference example had that the port of it
+  dropped, and an aggregate-initialization issue with default member initializers)
+  before ever reaching real hardware. `.pio/` is gitignored but left populated
+  locally, so the one-time toolchain/library download doesn't need to happen again.
 - **Presentation mode is a standalone document (`awards/present.html`), not an app-shell
   page with the sidebar hidden by CSS.** Zero app chrome ever enters the DOM, so there's
   nothing to flash or hide — matches DESIGN.md's "no page flash" for a screen an
@@ -194,9 +239,30 @@ building on top of it. Newest entries at the top of each section.
 - **Tie-break rule when two cars have identical total scores.** Currently surfaced to
   the host for a manual decision in the results/awards flow — no automatic rule.
   Revisit if hosts want this automated later.
-- **Exact touchscreen and Arducam part numbers.** Needed before firmware
-  display/camera work can start — display driver and camera init code are part-number
-  specific. Blocks: firmware display layer, firmware camera capture layer.
+- **Battery voltage monitoring — no ADC pin identified yet.** The CrowPanel 7" has a
+  JST battery connector with a charge circuit, but no documented voltage-sense ADC
+  anywhere (checked Elecrow's wiki, both community example repos, and an ESPHome PR
+  for this board). Need: a free ADC-capable GPIO from whatever's left unassigned, and
+  confirmation of a resistor divider (100kΩ + 100kΩ recommended: halves a 4.2V full
+  charge to a safe 2.1V at the ADC pin). `firmware/src/power/battery.h` deliberately
+  fails to compile (`#error`) until `PIN_BATTERY_ADC` is added to `pins.h` — see that
+  file. Blocks: battery bring-up test, `src/power/` sleep management.
+- **GPIO38 possibly double-claimed — needs a continuity check before soldering.** One
+  secondary source (an ESPHome community PR for this board) lists GPIO38 as "Touch
+  INT," which would conflict with its assignment as Camera CS. The verified *working*
+  reference example initializes GT911 touch with `INT=-1` (unused, pure I2C polling)
+  successfully, so firmware proceeds on the assumption GPIO38 is genuinely free — but
+  this wasn't independently confirmed against a schematic. A 30-second multimeter
+  continuity check between the GT911's INT pad and GPIO38 before soldering the camera
+  on would close this out for good.
+- **Once the Arducam is soldered onto GPIO43/44, this board loses its normal
+  USB-serial programming path** (UART0 via the CrowPanel's onboard bridge chip, which
+  is exactly what's being repurposed). Not a blocker — firmware bring-up and
+  iteration happens over UART0 before the camera's permanent installation, matching
+  the project's own "eventually solder directly" plan — but worth remembering before
+  reflashing becomes much less convenient. No native-USB fallback: GPIO19/20 (the
+  ESP32-S3's fixed native USB pins) are permanently wired to GT911 touch I2C on this
+  board.
 - **Whether the show uses Car Classes at all, or judges one combined field.** Affects
   whether "Best in Class" awards are always available or need to be conditionally
   hidden/disabled when a show doesn't define classes. Affects home base show-setup UI

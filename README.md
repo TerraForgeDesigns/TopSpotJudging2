@@ -28,9 +28,12 @@ needs internet must be done ahead of time, while you still have a connection.
 
 - [ ] **Python deps:** `pip install -r homebase/requirements.txt` into a local venv.
       Once installed, the venv is never rebuilt from the network again.
-- [ ] **PlatformIO toolchain + libraries:** open `/firmware` in PlatformIO and let it
-      download the ESP32-S3 platform, toolchain, and any libraries the firmware
-      depends on. This is a one-time download per machine that builds firmware.
+- [x] **PlatformIO toolchain + libraries:** `cd firmware && pio run -e handheld`
+      downloads the ESP32-S3 platform, toolchain, and both libraries (LovyanGFX,
+      Arducam_Mega — pinned exact versions, see `firmware/platformio.ini`) into
+      `.pio/`. Already done once in this repo as of the F1 hardware bring-up session
+      — all four environments build successfully offline from here. Re-run only if
+      `.pio/` gets deleted or a dependency version changes.
 - [ ] **Font files:** download the Archivo and IBM Plex Sans/Mono `.woff2` files and
       place them in `homebase/app/static/fonts/` (see DESIGN.md typography section).
       They are vendored into the repo, not linked from a font service, so this is a
