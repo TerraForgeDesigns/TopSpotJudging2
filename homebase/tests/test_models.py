@@ -13,6 +13,7 @@ from app.models import (
     JudgingScore,
     JudgingSubmission,
     Photo,
+    PhotoStatus,
     PhotoType,
     Show,
     SubmissionStatus,
@@ -146,11 +147,15 @@ def test_full_judging_chain(db_session):
 
     score = JudgingScore(submission_id=submission.id, criteria_id=criteria.id, points=22)
     photo = Photo(
+        show_id=show.id,
         car_id=car.id,
+        registration_number=car.registration_number,
         photo_type=PhotoType.CAR,
+        status=PhotoStatus.MATCHED,
         source_handheld_id=handheld.id,
         transfer_method=TransferMethod.USB,
         file_path="photos/0142_car.jpg",
+        original_filename="0142_car.jpg",
     )
     db_session.add_all([score, photo])
     db_session.commit()

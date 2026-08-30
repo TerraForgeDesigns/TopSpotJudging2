@@ -7,6 +7,51 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **One shared `ingest_photo_file()` for both transports.** USB and WiFi both end up
+  producing a source file that matches the `{registration_number}_car.jpg` /
+  `_sheet.jpg` naming convention — the WiFi endpoint (`POST /api/v1/photos/upload`)
+  constructs that filename from its `registration_number`/`photo_type` form fields and
+  writes it to a temp file before handing off, specifically so filename parsing,
+  duplicate detection, and unmatched-holding logic exist in exactly one place. See
+  `services/photo_ingest.py`.
+- **PROTOCOL.md's naming convention (`_car`/`_sheet`) is the vocabulary for the WiFi
+  upload's `photo_type` form field too** (`"car"` or `"sheet"`), not our internal
+  `PhotoType` enum's `"judge_sheet"`. PROTOCOL.md never states the endpoint's exact
+  allowed values — the filename convention is the only place it spells out these two
+  terms, so the wire form field mirrors that rather than an internal enum value the
+  document never mentions.
+- **A photo is copied, never moved, from its source — and never overwritten.** A
+  second photo for a car+type slot that's already filled is kept alongside the first
+  as `PhotoStatus.DUPLICATE`; a registration number matching no car is held as
+  `PhotoStatus.UNMATCHED` under `photos/<show_id>/_unmatched/`. Both need host
+  resolution but neither is ever silently dropped — see CONTEXT.md: photos are
+  irreplaceable after the show ends.
+- **Re-scanning an SD card that's already been imported is a no-op, not a fresh
+  duplicate.** Before copying, `ingest_photo_file` checks whether a file of the same
+  byte size already exists in the destination slot (or `_unmatched/`) and skips if so.
+  Judges' cards get reinserted all day (dead battery, "let me check", etc.) — without
+  this, every reinsertion would pile up spurious duplicate rows.
+- **Unmatched-photo resolution moves the file (not a copy) within our own managed
+  `photos/` tree**, and reuses the same never-overwrite duplicate check as a fresh
+  ingest. The "copy, don't move" rule is about protecting the judge's original SD-card
+  file, not about how home base reorganizes its own already-ingested copies.
+  `resolve_unmatched_photo` is a no-op if called on a photo that's already resolved
+  (found via manual testing: a double-submitted form was re-shuffling an
+  already-placed file into a spurious duplicate of itself — see
+  `test_resolving_an_already_resolved_photo_is_a_no_op`).
+- **USB removable-drive detection is Windows-only, isolated in `services/usb_windows.py`,
+  using `ctypes` against the Win32 API** (no pywin32/wmi/psutil — Pillow is the only new
+  dependency). `services/usb_watcher.py` never touches a Windows API directly;
+  supporting another OS later means writing a sibling module with the same
+  `list_removable_drives() -> list[Path]` signature and branching in one function,
+  not touching the polling loop or `photo_ingest.py`.
+- **The USB watcher scans and ingests automatically on drive detection** — no "click
+  import" step. Ingest is filename-filtered and idempotent-on-rescan, so plugging in
+  an unrelated drive is harmless (zero matches) and replugging the same card is a
+  no-op, which makes auto-scan safe and matches "the host needs to see it working,
+  not wonder if it's frozen." A manual "Scan connected drives" button (`POST
+  /photos/scan`) exists alongside it for a host who doesn't want to wait for the
+  watcher's poll cycle or wants to retry without unplugging/replugging.
 - **Unmatched registration numbers are held, not rejected.** A submission for a
   registration number that doesn't yet exist in the roster (e.g. a late-registered
   car judged before the handheld's roster pull caught up) is accepted and stored as
@@ -57,6 +102,12 @@ building on top of it. Newest entries at the top of each section.
 
 ## Open
 
+- **No duplicate-photo resolution UI yet.** `PhotoStatus.DUPLICATE` photos are counted
+  in the import summary and kept on disk, but there's no screen to view them side by
+  side and pick a winner (unlike unmatched photos, which do have a resolution view at
+  `/photos/unmatched`) — the task that added photo ingest only specified an unmatched
+  resolution view. Revisit if duplicates turn out to be common enough at a real show
+  to need more than "the host opens the folder and looks."
 - **No handheld provisioning UI yet.** Handhelds currently self-register on first
   sync (see the `handheld_id`-as-`label` decision above) — there's no home base
   screen to pre-register, rename, or deprovision one. Fine for now with 3–4 known

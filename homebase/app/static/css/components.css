@@ -529,6 +529,40 @@
 .stat-card--critical .stat-card__value { color: var(--red-500); }
 
 /* =========================================================
+   Progress bar (photo import)
+   ========================================================= */
+
+.progress-bar {
+  height: 8px;
+  background: var(--ink-700);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--gold-500);
+  transition: width var(--transition-base);
+}
+
+/* =========================================================
+   Photo thumbnails
+   ========================================================= */
+
+.photo-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  border: 1px solid var(--ink-600);
+}
+
+.photo-thumb--hero {
+  aspect-ratio: 16 / 10;
+}
+
+/* =========================================================
    Tables
    ========================================================= */
 

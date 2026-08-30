@@ -26,6 +26,12 @@ class PhotoType(str, enum.Enum):
     JUDGE_SHEET = "judge_sheet"
 
 
+class PhotoStatus(str, enum.Enum):
+    MATCHED = "matched"  # normal case: resolved to a car, no conflict
+    DUPLICATE = "duplicate"  # car+type slot was already filled — both kept, host resolves
+    UNMATCHED = "unmatched"  # registration number didn't match any car — held for host to assign
+
+
 class TransferMethod(str, enum.Enum):
     USB = "usb"
     WIFI = "wifi"

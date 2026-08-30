@@ -1,0 +1,50 @@
+<div id="photos-live" hx-get="/photos/live" hx-trigger="every 2s" hx-swap="outerHTML">
+  {% if status.state == "idle" %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">Waiting for a drive</h3>
+    <p>Plug in a handheld's SD card or USB drive — import starts automatically.</p>
+  </div>
+
+  {% elif status.state == "scanning" %}
+  <div class="card">
+    <div class="card__header">
+      <h3 class="card__title">Importing from {{ status.source_label }}</h3>
+      <span class="mono-label">{{ status.current_index }} / {{ status.total_files }}</span>
+    </div>
+    <div class="progress-bar" style="margin-bottom: var(--space-3);">
+      {% set pct = ((status.current_index / status.total_files) * 100) if status.total_files else 0 %}
+      <div class="progress-bar__fill" style="width: {{ pct }}%;"></div>
+    </div>
+    <p class="card__body mono-label" style="text-transform: none; letter-spacing: 0;">{{ status.current_filename }}</p>
+  </div>
+
+  {% elif status.state == "error" %}
+  <div class="card card--danger">
+    <h3 class="card__title" style="color: var(--red-500); margin-bottom: var(--space-2);">Import couldn't finish</h3>
+    <p class="card__body">{{ status.error_message }}</p>
+  </div>
+
+  {% elif status.state == "done" %}
+  <div class="card">
+    <div class="card__header">
+      <h3 class="card__title">Last import — {{ status.source_label }}</h3>
+    </div>
+    <div class="row">
+      <span class="pill pill--judged"><span class="pill__dot"></span>{{ status.imported }} imported</span>
+      {% if status.unmatched %}
+      <span class="pill pill--conflict"><span class="pill__dot"></span>{{ status.unmatched }} unmatched</span>
+      {% endif %}
+      {% if status.duplicate %}
+      <span class="pill pill--conflict"><span class="pill__dot"></span>{{ status.duplicate }} duplicate</span>
+      {% endif %}
+      {% if status.skipped %}
+      <span class="pill pill--unjudged"><span class="pill__dot"></span>{{ status.skipped }} skipped</span>
+      {% endif %}
+      {% if status.errors %}
+      <span class="pill pill--conflict"><span class="pill__dot"></span>{{ status.errors }} error{{ "s" if status.errors != 1 }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Photos — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Photos</h1>
+</div>
+
+{% if unmatched_count %}
+<div class="card card--danger" style="margin-bottom: var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);">
+  <div>
+    <h3 class="card__title" style="color: var(--red-500); margin-bottom: var(--space-1);">
+      {{ unmatched_count }} unmatched photo{{ "s" if unmatched_count != 1 }}
+    </h3>
+    <p class="card__body">Registration number didn't match any car — needs a manual assignment.</p>
+  </div>
+  <a href="/photos/unmatched" class="btn btn-destructive" style="flex-shrink: 0;">Resolve</a>
+</div>
+{% endif %}
+
+<section class="section">
+  <div class="card">
+    <div class="card__header">
+      <h3 class="card__title">Import photos from a handheld</h3>
+    </div>
+    <p class="card__body" style="margin-bottom: var(--space-5);">
+      Plug the handheld into USB (or insert its SD card) — home base watches for new drives and
+      imports automatically. Files are copied, never removed from the drive, so it's always safe
+      to try again. WiFi upload is the fallback if USB isn't available.
+    </p>
+    <div class="row" style="justify-content: space-between; align-items: center;">
+      <div class="mono-label">
+        {% if known_drives %}
+        Detected: {{ known_drives|join(", ") }}
+        {% else %}
+        No removable drive currently connected
+        {% endif %}
+      </div>
+      <form method="post" action="/photos/scan">
+        {{ c.button("Scan connected drives", "secondary", type="submit") }}
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  {% include "partials/photos_live.html" %}
+</section>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Unmatched Photos — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Unmatched photos</h1>
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    These registration numbers didn't match a car in the roster. The judge sheet photo is shown
+    largest — the registration number is usually handwritten on it, which is the fastest way to
+    figure out where each one belongs.
+  </p>
+</div>
+
+{% if groups %}
+<div class="card-grid">
+  {% for group in groups %}
+  <div class="card">
+    <div class="card__header">
+      <h3 class="card__title">Reg # <span class="mono-label" style="text-transform: none; letter-spacing: 0; font-size: var(--text-lg); color: var(--text-primary);">{{ group.registration_number }}</span></h3>
+    </div>
+
+    <form method="post" action="/photos/resolve" class="stack">
+      {% for photo in group.photos %}
+      <input type="hidden" name="photo_ids" value="{{ photo.id }}">
+      <div>
+        <span class="mono-label">{{ "Judge Sheet" if photo.photo_type.value == "judge_sheet" else "Car" }}</span>
+        {% if photo.thumbnail_path or photo.file_path %}
+        <img class="photo-thumb{{ ' photo-thumb--hero' if photo.photo_type.value == 'judge_sheet' }}"
+             src="/photo-files/{{ photo.thumbnail_path or photo.file_path }}" alt="{{ photo.original_filename }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <div class="field">
+        <label class="field__label" for="car_id_{{ group.registration_number }}">Assign to car</label>
+        <select class="select" id="car_id_{{ group.registration_number }}" name="car_id" required>
+          <option value="" disabled selected>Select a car…</option>
+          {% for car in cars %}
+          <option value="{{ car.id }}">{{ car.registration_number }} — {{ car.year }} {{ car.make }} {{ car.model }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {{ c.button("Assign", "primary", type="submit") }}
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">Nothing to resolve</h3>
+  <p>Every imported photo matched a car already in the roster.</p>
+</div>
+{% endif %}
+{% endblock %}

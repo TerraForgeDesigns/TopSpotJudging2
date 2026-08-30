@@ -1,13 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
-from app.config import APP_DIR
+from app.config import APP_DIR, PHOTOS_DIR
+from app.services.usb_watcher import UsbWatcherThread
 from app.web import router as web_router
 
-app = FastAPI(title="Top Spot Judging — Home Base")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    watcher = UsbWatcherThread()
+    watcher.start()
+    yield
+    watcher.stop()
+
+
+app = FastAPI(title="Top Spot Judging — Home Base", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+app.mount("/photo-files", StaticFiles(directory=str(PHOTOS_DIR)), name="photo_files")
 
 app.include_router(web_router)
 app.include_router(api_router)

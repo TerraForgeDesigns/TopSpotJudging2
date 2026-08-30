@@ -19,7 +19,7 @@ NAV_ITEMS: list[NavItem] = [
     NavItem("Cars", "/cars"),
     NavItem("Judging Criteria", "/criteria"),
     NavItem("Classes", "/classes"),
-    NavItem("Photos", "/photos", enabled=False),
+    NavItem("Photos", "/photos"),
     NavItem("Results", "/results", enabled=False),
     NavItem("Awards", "/awards", enabled=False),
     NavItem("Styleguide", "/styleguide"),
