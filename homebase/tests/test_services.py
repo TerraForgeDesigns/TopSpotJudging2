@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from app.models import CarStatus
 from app.services import car_classes as car_classes_service
@@ -76,7 +76,13 @@ def test_deactivate_criteria_preserves_historical_scores(db_session):
     db_session.add(handheld)
     db_session.commit()
 
-    submission = JudgingSubmission(car_id=car.id, handheld_id=handheld.id)
+    submission = JudgingSubmission(
+        show_id=show.id,
+        car_id=car.id,
+        registration_number=car.registration_number,
+        handheld_id=handheld.id,
+        closed_at=datetime.now(timezone.utc),
+    )
     db_session.add(submission)
     db_session.commit()
     score = JudgingScore(submission_id=submission.id, criteria_id=criteria.id, points=22)
@@ -109,7 +115,13 @@ def test_delete_car_cascades_submissions_and_scores(db_session):
     handheld = Handheld(label="Judge 1")
     db_session.add(handheld)
     db_session.commit()
-    submission = JudgingSubmission(car_id=car.id, handheld_id=handheld.id)
+    submission = JudgingSubmission(
+        show_id=show.id,
+        car_id=car.id,
+        registration_number=car.registration_number,
+        handheld_id=handheld.id,
+        closed_at=datetime.now(timezone.utc),
+    )
     db_session.add(submission)
     db_session.commit()
     score = JudgingScore(submission_id=submission.id, criteria_id=criteria.id, points=22)
@@ -131,7 +143,15 @@ def test_delete_car_requires_confirmation_summary_reports_data(db_session):
     handheld = Handheld(label="Judge 1")
     db_session.add(handheld)
     db_session.commit()
-    db_session.add(JudgingSubmission(car_id=car.id, handheld_id=handheld.id))
+    db_session.add(
+        JudgingSubmission(
+            show_id=show.id,
+            car_id=car.id,
+            registration_number=car.registration_number,
+            handheld_id=handheld.id,
+            closed_at=datetime.now(timezone.utc),
+        )
+    )
     db_session.commit()
 
     summary = cars_service.judging_data_summary(db_session, car.id)

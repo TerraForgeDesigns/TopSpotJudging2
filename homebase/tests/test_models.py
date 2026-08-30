@@ -1,5 +1,5 @@
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -133,7 +133,13 @@ def test_full_judging_chain(db_session):
     db_session.commit()
 
     submission = JudgingSubmission(
-        car_id=car.id, handheld_id=handheld.id, judge_name="R. Alvarez", status=SubmissionStatus.ACCEPTED
+        show_id=show.id,
+        car_id=car.id,
+        registration_number=car.registration_number,
+        handheld_id=handheld.id,
+        judge_name="R. Alvarez",
+        closed_at=datetime.now(timezone.utc),
+        status=SubmissionStatus.ACCEPTED,
     )
     db_session.add(submission)
     db_session.commit()

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.services import dashboard as dashboard_service
+from app.services import sync as sync_service
 from app.templating import templates
 from app.web.context import base_context
 
@@ -15,9 +16,11 @@ def _dashboard_live_context(request: Request, db: Session) -> dict:
     if show is not None:
         context["summary"] = dashboard_service.get_summary(db, show.id)
         context["handheld_statuses"] = dashboard_service.get_handheld_statuses(db)
+        context["unmatched_count"] = len(sync_service.list_unmatched_submissions(db, show.id))
     else:
         context["summary"] = None
         context["handheld_statuses"] = []
+        context["unmatched_count"] = 0
     return context
 
 

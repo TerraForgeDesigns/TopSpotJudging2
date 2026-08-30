@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Car, CarClass
+from app.services import sync as sync_service
 
 REQUIRED_COLUMNS = ["registration_number", "car_number", "make", "model", "year", "class_name"]
 
@@ -159,25 +160,30 @@ def commit_import(db: Session, show_id: int, csv_text: str) -> ImportSummary:
     preview = build_preview(db, csv_text)
 
     class_cache: dict[str, CarClass] = {}
-    imported = 0
+    created_cars: list[Car] = []
     for row in preview.valid_rows:
         class_id = None
         if row.class_name:
             car_class = _get_or_create_class(db, show_id, row.class_name, class_cache)
             class_id = car_class.id
 
-        db.add(
-            Car(
-                show_id=show_id,
-                registration_number=row.registration_number,
-                display_car_number=row.car_number,
-                make=row.make,
-                model=row.model,
-                year=int(row.year_raw),
-                class_id=class_id,
-            )
+        car = Car(
+            show_id=show_id,
+            registration_number=row.registration_number,
+            display_car_number=row.car_number,
+            make=row.make,
+            model=row.model,
+            year=int(row.year_raw),
+            class_id=class_id,
         )
-        imported += 1
+        db.add(car)
+        created_cars.append(car)
 
     db.commit()
-    return ImportSummary(imported_count=imported, skipped_rows=preview.error_rows)
+
+    # A late-registered car may have been judged (registration number
+    # unmatched) before it existed here — see services/sync.py.
+    for car in created_cars:
+        sync_service.reconcile_unmatched_for_car(db, car)
+
+    return ImportSummary(imported_count=len(created_cars), skipped_rows=preview.error_rows)

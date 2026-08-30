@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Car
+from app.services import sync as sync_service
 
 
 class DuplicateRegistrationNumber(ValueError):
@@ -65,6 +66,7 @@ def create_car(
     db.add(car)
     db.commit()
     db.refresh(car)
+    sync_service.reconcile_unmatched_for_car(db, car)
     return car
 
 
@@ -97,6 +99,7 @@ def update_car(
     car.announcer_name = (announcer_name or "").strip() or None
     db.commit()
     db.refresh(car)
+    sync_service.reconcile_unmatched_for_car(db, car)
     return car
 
 
