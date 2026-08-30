@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Bulk Import — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Bulk import cars</h1>
+</div>
+
+{% if not preview %}
+<div class="card" style="max-width: 640px;">
+  <p class="card__body" style="margin-bottom: var(--space-5);">
+    CSV columns, in any order: <span class="mono-label" style="text-transform: none; letter-spacing: 0;">registration_number, car_number, make, model, year, class_name</span>.
+    <code>class_name</code> is matched to an existing class by name (case-insensitive) or created if it
+    doesn't exist yet. Leave it blank for Unclassified.
+  </p>
+  <form method="post" action="/cars/import/preview" enctype="multipart/form-data" class="stack">
+    <div class="field">
+      <label class="field__label" for="file">CSV file</label>
+      <input class="input" id="file" name="file" type="file" accept=".csv,text/csv" required>
+    </div>
+    <div>{{ c.button("Preview import", "primary", type="submit") }}</div>
+  </form>
+</div>
+
+{% else %}
+
+  {% if preview.header_error %}
+  <div class="card card--danger" style="max-width: 640px;">
+    <h3 class="card__title" style="color: var(--red-500); margin-bottom: var(--space-3);">Can't read this file</h3>
+    <p class="card__body">{{ preview.header_error }}</p>
+    <div style="margin-top: var(--space-5);">
+      <a href="/cars/import" class="btn btn-secondary">Try another file</a>
+    </div>
+  </div>
+
+  {% else %}
+
+  <div class="row" style="justify-content: space-between; margin-bottom: var(--space-6); align-items: flex-start;">
+    <div>
+      <p style="color: var(--text-secondary);">
+        <strong style="color: var(--green-500);">{{ preview.valid_rows|length }}</strong> row(s) ready to import.
+        {% if preview.error_rows %}
+        <strong style="color: var(--red-500);">{{ preview.error_rows|length }}</strong> row(s) will be skipped —
+        see errors below.
+        {% endif %}
+      </p>
+    </div>
+    <div class="row">
+      <a href="/cars/import" class="btn btn-secondary">Start over</a>
+      <form method="post" action="/cars/import/confirm">
+        <textarea name="csv_text" hidden>{{ csv_text }}</textarea>
+        {{ c.button("Confirm import", "primary", type="submit", disabled=(preview.valid_rows|length == 0)) }}
+      </form>
+    </div>
+  </div>
+
+  <div class="table-wrap table-wrap--scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width: 70px;">Row</th>
+          <th>Reg #</th>
+          <th>Car #</th>
+          <th>Make / Model</th>
+          <th>Year</th>
+          <th>Class</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview.rows %}
+        <tr style="{{ 'background: rgba(240, 68, 56, 0.06);' if not row.ok }}">
+          <td class="col-num">{{ row.row_number }}</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ row.registration_number }}</td>
+          <td class="col-num">{{ row.car_number }}</td>
+          <td>{{ row.make }} {{ row.model }}</td>
+          <td class="col-num">{{ row.year_raw }}</td>
+          <td>{{ row.class_name or "Unclassified" }}</td>
+          <td>
+            {% if row.ok %}
+            {{ c.pill("Will import", "judged") }}
+            {% else %}
+            <div class="stack" style="gap: var(--space-1);">
+              {{ c.pill("Skipped", "conflict") }}
+              {% for error in row.errors %}
+              <span style="font-size: var(--text-xs); color: var(--red-500);">{{ error }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

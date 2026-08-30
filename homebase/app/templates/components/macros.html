@@ -9,11 +9,11 @@
 <span class="pill pill--{{ status }}"><span class="pill__dot"></span>{{ label }}</span>
 {% endmacro %}
 
-{% macro field(label, name, type="text", placeholder="", hint="", error="", disabled=False) %}
+{% macro field(label, name, type="text", placeholder="", hint="", error="", disabled=False, required=True, value="") %}
 <div class="field">
   <label class="field__label" for="{{ name }}">{{ label }}</label>
   <input class="input{{ ' input--error' if error }}" id="{{ name }}" name="{{ name }}" type="{{ type }}"
-    placeholder="{{ placeholder }}"{{ ' disabled' if disabled }}>
+    placeholder="{{ placeholder }}" value="{{ value }}"{{ ' disabled' if disabled }}{{ ' required' if required }}>
   {% if error %}<span class="field__error">{{ error }}</span>
   {% elif hint %}<span class="field__hint">{{ hint }}</span>{% endif %}
 </div>

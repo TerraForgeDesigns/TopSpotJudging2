@@ -34,5 +34,13 @@ class Car(Base):
 
     show: Mapped["Show"] = relationship(back_populates="cars")
     car_class: Mapped["CarClass | None"] = relationship(back_populates="cars")
-    submissions: Mapped[list["JudgingSubmission"]] = relationship(back_populates="car")
-    photos: Mapped[list["Photo"]] = relationship(back_populates="car")
+    # Deleting a car explicitly takes its judging data with it (see
+    # services/cars.py delete_car, which requires a confirmation naming what's
+    # lost before this ever fires) — cascade="all, delete-orphan" makes that
+    # cascade explicit at the ORM level rather than relying on DB-level
+    # ON DELETE CASCADE, which SQLite's PRAGMA foreign_keys=ON would otherwise
+    # reject as a constraint violation on a bare car delete.
+    submissions: Mapped[list["JudgingSubmission"]] = relationship(
+        back_populates="car", cascade="all, delete-orphan"
+    )
+    photos: Mapped[list["Photo"]] = relationship(back_populates="car", cascade="all, delete-orphan")

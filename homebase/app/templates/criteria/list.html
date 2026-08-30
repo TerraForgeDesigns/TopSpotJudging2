@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Judging Criteria — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Judging Criteria</h1>
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    The scoring rubric every judge uses on every car. Deactivating a criterion removes
+    it from future judging but never touches scores already submitted against it —
+    those stay intact in results.
+  </p>
+</div>
+
+<section class="section">
+  <div class="card" style="max-width: 560px;">
+    <form method="post" action="/criteria" class="row" style="align-items: flex-end;">
+      <div class="field" style="flex: 1;">
+        <label class="field__label" for="name">New criterion</label>
+        <input class="input" id="name" name="name" type="text" placeholder="e.g. Paint" required>
+      </div>
+      <div class="field" style="max-width: 140px;">
+        <label class="field__label" for="max_points">Max points</label>
+        <input class="input" id="max_points" name="max_points" type="number" min="1" max="1000" value="25" required>
+      </div>
+      {{ c.button("Add", "primary", type="submit") }}
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  {% if criteria_list %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width: 90px;">Order</th>
+          <th>Name</th>
+          <th style="width: 140px;">Max points</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for criterion in criteria_list %}
+        <tr style="{{ 'opacity: 0.55;' if not criterion.active }}">
+          <td>
+            <div class="row" style="gap: var(--space-1);">
+              <form method="post" action="/criteria/{{ criterion.id }}/move">
+                <input type="hidden" name="direction" value="up">
+                <button type="submit" class="btn btn-secondary btn-icon" aria-label="Move up"{{ ' disabled' if loop.first }}>&uarr;</button>
+              </form>
+              <form method="post" action="/criteria/{{ criterion.id }}/move">
+                <input type="hidden" name="direction" value="down">
+                <button type="submit" class="btn btn-secondary btn-icon" aria-label="Move down"{{ ' disabled' if loop.last }}>&darr;</button>
+              </form>
+            </div>
+          </td>
+          <td colspan="2">
+            <form method="post" action="/criteria/{{ criterion.id }}" class="row" style="flex-wrap: nowrap;">
+              <input class="input" name="name" value="{{ criterion.name }}" style="max-width: 220px;">
+              <input class="input" name="max_points" type="number" min="1" max="1000" value="{{ criterion.max_points }}" style="max-width: 100px;">
+              <button type="submit" class="btn btn-secondary btn--sm">Save</button>
+            </form>
+          </td>
+          <td>
+            {% if criterion.active %}
+            {{ c.pill("Active", "judged") }}
+            {% else %}
+            {{ c.pill("Inactive", "unjudged") }}
+            {% endif %}
+          </td>
+          <td style="text-align: right;">
+            <form method="post" action="/criteria/{{ criterion.id }}/toggle-active">
+              <input type="hidden" name="active" value="{{ 'false' if criterion.active else 'true' }}">
+              {% if criterion.active %}
+              <button type="submit" class="btn btn-secondary btn--sm">Deactivate</button>
+              {% else %}
+              <button type="submit" class="btn btn-primary btn--sm">Reactivate</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">No judging criteria yet</h3>
+    <p>Add at least one criterion above before judging can begin.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

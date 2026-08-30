@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Shows — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">Setup</span>
+  <h1>Shows</h1>
+  <p style="color: var(--text-secondary); max-width: 60ch;">
+    Everything else in this app — cars, classes, criteria, judging — operates on
+    whichever show is active below.
+  </p>
+</div>
+
+<section class="section">
+  <h2 class="section__title">New show</h2>
+  <div class="card" style="max-width: 640px;">
+    <form method="post" action="/shows" class="stack">
+      {{ c.field("Show name", "name", placeholder="e.g. Fall Cruise-In") }}
+      <div class="row" style="align-items: flex-start;">
+        <div class="field">
+          <label class="field__label" for="event_date">Event date</label>
+          <input class="input" id="event_date" name="event_date" type="date" required>
+        </div>
+        {{ c.field("Location", "location", placeholder="e.g. Downtown Lot") }}
+      </div>
+      <div>{{ c.button("Create show", "primary", type="submit") }}</div>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section__title">All shows</h2>
+  {% if shows %}
+  <div class="card-grid">
+    {% for show in shows %}
+    <div class="card">
+      <div class="card__header">
+        <h3 class="card__title">{{ show.name }}</h3>
+        {% if active_show and active_show.id == show.id %}
+        {{ c.pill("Active", "judged") }}
+        {% endif %}
+      </div>
+      <div class="card__body stack">
+        <div>{{ show.event_date.strftime('%b %d, %Y') }}</div>
+        <div>{{ show.location }}</div>
+      </div>
+      <div class="row" style="margin-top: var(--space-5);">
+        {% if not (active_show and active_show.id == show.id) %}
+        <form method="post" action="/shows/{{ show.id }}/activate">
+          {{ c.button("Set active", "primary", type="submit", size="sm") }}
+        </form>
+        {% endif %}
+        <a href="/shows/{{ show.id }}/edit" class="btn btn-secondary btn--sm">Edit</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty-state">
+    <div class="empty-state__icon">—</div>
+    <h3 class="empty-state__title">No shows yet</h3>
+    <p>Create your first show above to begin setup.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

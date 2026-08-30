@@ -1,0 +1,63 @@
+{% import "components/macros.html" as c %}
+<div id="dashboard-live" hx-get="/dashboard/live" hx-trigger="every 15s" hx-swap="outerHTML">
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-card__label"><span class="stat-card__dot"></span>Total Cars</div>
+      <div class="stat-card__value">{{ summary.total_cars }}</div>
+    </div>
+    <div class="stat-card stat-card--judged">
+      <div class="stat-card__label"><span class="stat-card__dot"></span>Judged</div>
+      <div class="stat-card__value">{{ summary.judged }}</div>
+    </div>
+    <div class="stat-card stat-card--critical">
+      <div class="stat-card__label"><span class="stat-card__dot"></span>Unjudged</div>
+      <div class="stat-card__value">{{ summary.unjudged }}</div>
+    </div>
+    <div class="stat-card stat-card--critical">
+      <div class="stat-card__label"><span class="stat-card__dot"></span>Flagged Conflicts</div>
+      <div class="stat-card__value">{{ summary.flagged_conflict }}</div>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2 class="section__title">Handhelds</h2>
+    {% if handheld_statuses %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>Last sync</th>
+            <th class="col-num">Battery</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for hs in handheld_statuses %}
+          <tr>
+            <td>{{ hs.handheld.label }}</td>
+            <td>{{ hs.relative_sync }}</td>
+            <td class="col-num">{{ hs.battery_pct ~ "%" if hs.battery_pct is not none else "—" }}</td>
+            <td>
+              {% if hs.sync_state == "fresh" %}
+              {{ c.pill("Synced", "judged") }}
+              {% elif hs.sync_state == "stale" %}
+              {{ c.pill("Pending Sync", "pending") }}
+              {% else %}
+              {{ c.pill("No Recent Sync", "conflict") }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card empty-state">
+      <div class="empty-state__icon">—</div>
+      <h3 class="empty-state__title">No handhelds registered yet</h3>
+      <p>Handhelds appear here after their first sync with home base.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>

@@ -15,9 +15,10 @@ class NavItem:
 
 NAV_ITEMS: list[NavItem] = [
     NavItem("Dashboard", "/"),
-    NavItem("Cars", "/cars", enabled=False),
-    NavItem("Judging Criteria", "/criteria", enabled=False),
-    NavItem("Classes", "/classes", enabled=False),
+    NavItem("Shows", "/shows"),
+    NavItem("Cars", "/cars"),
+    NavItem("Judging Criteria", "/criteria"),
+    NavItem("Classes", "/classes"),
     NavItem("Photos", "/photos", enabled=False),
     NavItem("Results", "/results", enabled=False),
     NavItem("Awards", "/awards", enabled=False),

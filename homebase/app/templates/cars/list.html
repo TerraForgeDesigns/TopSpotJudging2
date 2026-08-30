@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as c %}
+{% block title %}Cars — Top Spot Judging{% endblock %}
+{% block content %}
+<div class="page-header">
+  <span class="page-header__eyebrow">{{ active_show.name }}</span>
+  <h1>Cars</h1>
+</div>
+
+{% if import_result %}
+<div class="toast toast--success" style="margin-bottom: var(--space-6); max-width: 480px;">
+  <div>
+    <div class="toast__title">Import complete</div>
+    <div class="toast__body">
+      {{ import_result.imported }} car(s) imported.
+      {% if import_result.skipped %}{{ import_result.skipped }} row(s) skipped — see the errors shown during preview.{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if duplicate %}
+<div class="toast toast--error" style="margin-bottom: var(--space-6); max-width: 480px;">
+  <div>
+    <div class="toast__title">Registration number already in use</div>
+    <div class="toast__body">'{{ duplicate }}' is already assigned to another car.</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row" style="justify-content: space-between; margin-bottom: var(--space-6);">
+  <div class="row">
+    <div class="field" style="max-width: 220px;">
+      <input class="input" type="text" placeholder="Search reg #" data-filter-for="roster" data-filter-key="reg">
+    </div>
+    <div class="field" style="max-width: 220px;">
+      <input class="input" type="text" placeholder="Search make" data-filter-for="roster" data-filter-key="make">
+    </div>
+    <div class="field" style="max-width: 200px;">
+      <select class="select" data-filter-for="roster" data-filter-key="class">
+        <option value="">All classes</option>
+        {% for car_class in classes %}
+        <option value="{{ car_class.name|lower }}">{{ car_class.name }}</option>
+        {% endfor %}
+        <option value="unclassified">Unclassified</option>
+      </select>
+    </div>
+    <div class="field" style="max-width: 200px;">
+      <select class="select" data-filter-for="roster" data-filter-key="status">
+        <option value="">All statuses</option>
+        <option value="judged">Judged</option>
+        <option value="unjudged">Unjudged</option>
+        <option value="flagged_conflict">Conflict</option>
+      </select>
+    </div>
+  </div>
+  <div class="row">
+    <a href="/cars/import" class="btn btn-secondary">Bulk import</a>
+    <button type="button" class="btn btn-primary" data-modal-open="add-car-modal">Add car</button>
+  </div>
+</div>
+
+{% if cars %}
+<div class="table-wrap table-wrap--scroll" data-filter-table="roster">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Reg #</th>
+        <th>Car #</th>
+        <th>Make / Model</th>
+        <th>Year</th>
+        <th>Class</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for car in cars %}
+      <tr data-row
+        data-reg="{{ car.registration_number }}"
+        data-make="{{ car.make }}"
+        data-class="{{ (car.car_class.name if car.car_class else 'unclassified')|lower }}"
+        data-status="{{ car.status.value }}"
+      >
+        <td class="mono-label" style="text-transform: none; letter-spacing: 0;">{{ car.registration_number }}</td>
+        <td class="col-num">{{ car.display_car_number }}</td>
+        <td>{{ car.year }} {{ car.make }} {{ car.model }}</td>
+        <td class="col-num">{{ car.year }}</td>
+        <td>{{ car.car_class.name if car.car_class else "Unclassified" }}</td>
+        <td>
+          {% if car.status.value == "judged" %}{{ c.pill("Judged", "judged") }}
+          {% elif car.status.value == "flagged_conflict" %}{{ c.pill("Conflict", "conflict") }}
+          {% else %}{{ c.pill("Unjudged", "unjudged") }}{% endif %}
+        </td>
+        <td style="text-align: right;">
+          <a href="/cars/{{ car.id }}/edit" class="btn btn-secondary btn--sm">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr data-empty-row hidden>
+        <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: var(--space-8);">
+          No cars match these filters.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="empty-state__icon">—</div>
+  <h3 class="empty-state__title">No cars registered</h3>
+  <p>Add a car above, or bulk import a roster from a CSV file.</p>
+</div>
+{% endif %}
+
+<div class="modal-overlay" id="add-car-modal" hidden>
+  <div class="modal">
+    <h3 class="modal__title">Add car</h3>
+    <form method="post" action="/cars" class="stack">
+      {{ c.field("Registration number", "registration_number", placeholder="e.g. 0142") }}
+      {{ c.field("Car number", "display_car_number", placeholder="e.g. 142") }}
+      <div class="row" style="align-items: flex-start;">
+        {{ c.field("Make", "make", placeholder="Chevrolet") }}
+        {{ c.field("Model", "model", placeholder="Camaro") }}
+      </div>
+      <div class="field">
+        <label class="field__label" for="year">Year</label>
+        <input class="input" id="year" name="year" type="number" min="1885" max="2100" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="class_id">Class</label>
+        <select class="select" id="class_id" name="class_id">
+          <option value="">Unclassified</option>
+          {% for car_class in classes %}
+          <option value="{{ car_class.id }}">{{ car_class.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal__actions">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add car</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

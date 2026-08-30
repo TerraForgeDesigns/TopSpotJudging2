@@ -1,29 +1,39 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.orm import Session
 
+from app.db import get_db
+from app.services import dashboard as dashboard_service
 from app.templating import templates
-from app.web.nav import NAV_ITEMS
+from app.web.context import base_context
 
 router = APIRouter()
 
 
-def _base_context(request: Request, active_path: str) -> dict:
-    return {
-        "request": request,
-        "nav_items": NAV_ITEMS,
-        "active_path": active_path,
-        # Placeholder connection status until the sync service exists — the
-        # app shell always shows *something* here, never a blank area.
-        "connection_status": "no_show_loaded",
-    }
+def _dashboard_live_context(request: Request, db: Session) -> dict:
+    context = base_context(request, db, "/")
+    show = context["active_show"]
+    if show is not None:
+        context["summary"] = dashboard_service.get_summary(db, show.id)
+        context["handheld_statuses"] = dashboard_service.get_handheld_statuses(db)
+    else:
+        context["summary"] = None
+        context["handheld_statuses"] = []
+    return context
 
 
 @router.get("/")
-def dashboard(request: Request):
-    context = _base_context(request, "/")
+def dashboard(request: Request, db: Session = Depends(get_db)):
+    context = _dashboard_live_context(request, db)
     return templates.TemplateResponse(request, "dashboard.html", context)
 
 
+@router.get("/dashboard/live")
+def dashboard_live(request: Request, db: Session = Depends(get_db)):
+    context = _dashboard_live_context(request, db)
+    return templates.TemplateResponse(request, "partials/dashboard_live.html", context)
+
+
 @router.get("/styleguide")
-def styleguide(request: Request):
-    context = _base_context(request, "/styleguide")
+def styleguide(request: Request, db: Session = Depends(get_db)):
+    context = base_context(request, db, "/styleguide")
     return templates.TemplateResponse(request, "styleguide.html", context)

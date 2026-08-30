@@ -120,6 +120,19 @@
   color: var(--text-secondary);
 }
 
+.status-widget__switch {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--gold-500);
+  margin-top: var(--space-1);
+  transition: color var(--transition-fast);
+}
+
+.status-widget__switch:hover {
+  color: var(--gold-400);
+  text-decoration: underline;
+}
+
 .main {
   padding: var(--space-8) var(--space-10);
   max-width: 1280px;
@@ -226,6 +239,13 @@
   height: 36px;
   padding: 0 var(--space-4);
   font-size: var(--text-sm);
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .btn-primary {
@@ -380,6 +400,10 @@
   color: var(--text-secondary);
 }
 
+.card--danger {
+  border-color: var(--red-500);
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -449,6 +473,62 @@
 .pill--unjudged .pill__dot { background: var(--ink-400); }
 
 /* =========================================================
+   Stat cards (dashboard)
+   ========================================================= */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.stat-card {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+}
+
+.stat-card__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--mono-label-tracking);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.stat-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-400);
+  flex-shrink: 0;
+}
+
+.stat-card__value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-3xl);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* Both "Unjudged" and "Flagged Conflict" map to red-500 per DESIGN.md's
+   token table ("conflict, error, unjudged-critical") — distinguished by
+   label, not color, same as two red pills can coexist on one row. */
+.stat-card--judged .stat-card__dot { background: var(--green-500); }
+.stat-card--judged .stat-card__value { color: var(--green-500); }
+
+.stat-card--critical .stat-card__dot { background: var(--red-500); }
+.stat-card--critical .stat-card__value { color: var(--red-500); }
+
+/* =========================================================
    Tables
    ========================================================= */
 
@@ -456,6 +536,21 @@
   overflow-x: auto;
   border: 1px solid var(--ink-600);
   border-radius: var(--radius-md);
+}
+
+/* Large rosters (400 rows) get a bounded, independently-scrolling table
+   body so the header stays put and the page chrome (search/filters,
+   sidebar) never scrolls out of view. */
+.table-wrap--scroll {
+  max-height: 640px;
+  overflow-y: auto;
+}
+
+.table-wrap--scroll .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ink-800); /* occludes rows scrolling underneath the sticky header */
 }
 
 .table {
