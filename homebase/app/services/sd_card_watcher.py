@@ -1,10 +1,19 @@
 """
-OS-agnostic USB drive watcher + scan orchestration. Mount detection is
-delegated to a platform-specific module (usb_windows.py today); this file
-never touches a Windows API directly, so adding another OS later is a
-matter of writing that OS's list_removable_drives() and branching in
-list_removable_drives() below — the polling loop and everything that
-happens after a drive is detected stays untouched.
+OS-agnostic SD card watcher + scan orchestration. The handheld cannot
+present itself as a USB drive — its USB-C port is a CH340C serial
+programming bridge, and the ESP32-S3's native USB pins are already used
+by the touchscreen (see firmware/include/pins.h) — so the only way a
+photo gets from a handheld to this computer without Wi-Fi is physically:
+the operator pulls the microSD card out of the handheld and puts it in
+this computer's card reader. Windows reports that the same way it
+reports any removable drive, which is what this module watches for.
+
+Mount detection is delegated to a platform-specific module
+(sd_card_windows.py today); this file never touches a Windows API
+directly, so adding another OS later is a matter of writing that OS's
+list_removable_drives() and branching in list_removable_drives() below —
+the polling loop and everything that happens after a card is detected
+stays untouched.
 """
 import sys
 import threading
@@ -25,7 +34,7 @@ def list_removable_drives() -> list[Path]:
     offer a manual "scan now" trigger independent of the watcher's own
     poll cadence."""
     if sys.platform.startswith("win"):
-        from app.services.usb_windows import list_removable_drives as _list_windows
+        from app.services.sd_card_windows import list_removable_drives as _list_windows
 
         return _list_windows()
     return []  # no watcher support on this OS yet — see module docstring
@@ -47,7 +56,7 @@ def scan_and_ingest_drive(drive_root: Path, source_label: str) -> None:
         status_service.start_scan(source_label, len(candidates))
         for index, source_path in enumerate(candidates, start=1):
             status_service.report_progress(index, source_path.name)
-            result = ingest_photo_file(db, source_path, show.id, TransferMethod.USB)
+            result = ingest_photo_file(db, source_path, show.id, TransferMethod.SD_CARD)
             status_service.record_result(result.status)
         status_service.finish_scan()
     except Exception as exc:  # noqa: BLE001 - a scan failing must be visible, never silent
@@ -56,13 +65,14 @@ def scan_and_ingest_drive(drive_root: Path, source_label: str) -> None:
         db.close()
 
 
-class UsbWatcherThread(threading.Thread):
-    """Polls for newly-mounted removable drives and scans each one once,
-    the moment it appears. Daemon thread — dies with the process, no
-    explicit shutdown needed for a desktop app's lifetime."""
+class SdCardWatcherThread(threading.Thread):
+    """Polls for newly-mounted removable drives (in practice: a judge's
+    microSD card in a card reader) and scans each one once, the moment it
+    appears. Daemon thread — dies with the process, no explicit shutdown
+    needed for a desktop app's lifetime."""
 
     def __init__(self) -> None:
-        super().__init__(daemon=True, name="usb-watcher")
+        super().__init__(daemon=True, name="sd-card-watcher")
         self._stop_event = threading.Event()
         self._known_drives: set[str] = set()
 

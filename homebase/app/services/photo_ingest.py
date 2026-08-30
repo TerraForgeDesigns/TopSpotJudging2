@@ -1,9 +1,13 @@
 """
-The ONE shared photo ingest path — used by both the USB watcher
-(services/usb_watcher.py) and the WiFi fallback endpoint
-(api/photos.py). See PROTOCOL.md: "[WiFi upload] shares the same
-server-side ingest logic as the USB path — both end up writing the same
-file naming convention... into the same photo store."
+The ONE shared photo ingest path — used by both the SD card watcher
+(services/sd_card_watcher.py) and the Wi-Fi fallback endpoint
+(api/photos.py). Photos never arrive by USB: the handheld can't present
+itself as a drive (its USB-C is a CH340C serial programming bridge, and
+the ESP32-S3's native USB pins are already used by the touchscreen), so
+the only direct path is the operator physically moving the handheld's
+microSD card into this computer. See PROTOCOL.md: "[Wi-Fi upload] shares
+the same server-side ingest logic as the SD card path — both end up
+writing the same file naming convention... into the same photo store."
 
 Hard rules (CONTEXT.md — photos are irreplaceable after the show ends):
   - The original source file is only ever copied, never moved or deleted.

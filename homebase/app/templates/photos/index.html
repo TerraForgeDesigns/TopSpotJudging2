@@ -24,23 +24,24 @@
 <section class="section">
   <div class="card">
     <div class="card__header">
-      <h3 class="card__title">Import photos from a handheld</h3>
+      <h3 class="card__title">Import Photos</h3>
     </div>
     <p class="card__body" style="margin-bottom: var(--space-5);">
-      Plug the handheld into USB (or insert its SD card) — home base watches for new drives and
-      imports automatically. Files are copied, never removed from the drive, so it's always safe
-      to try again. WiFi upload is the fallback if USB isn't available.
+      Take the memory card out of the handheld and put it in this computer. Home Base
+      detects it and imports automatically. Files are copied, never removed from the
+      card, so it's always safe to try again. Wi-Fi upload is the fallback if the card
+      can't be read directly.
     </p>
     <div class="row" style="justify-content: space-between; align-items: center;">
       <div class="mono-label">
         {% if known_drives %}
-        Detected: {{ known_drives|join(", ") }}
+        Card detected: {{ known_drives|join(", ") }}
         {% else %}
-        No removable drive currently connected
+        No memory card currently connected
         {% endif %}
       </div>
       <form method="post" action="/photos/scan">
-        {{ c.button("Scan connected drives", "secondary", type="submit") }}
+        {{ c.button("Import Now", "secondary", type="submit") }}
       </form>
     </div>
   </div>

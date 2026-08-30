@@ -1,7 +1,7 @@
 """
-WiFi fallback path for photo transfer — see PROTOCOL.md POST /photos/upload.
+Wi-Fi fallback path for photo transfer — see PROTOCOL.md POST /photos/upload.
 Writes the upload to a temp file named per the naming convention, then
-hands off to the exact same ingest_photo_file() the USB watcher uses
+hands off to the exact same ingest_photo_file() the SD card watcher uses
 (see services/photo_ingest.py's module docstring).
 """
 import shutil

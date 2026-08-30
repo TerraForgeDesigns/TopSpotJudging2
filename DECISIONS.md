@@ -7,6 +7,55 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **Photos never travel by USB — corrected throughout the codebase and docs, not
+  just the UI text.** The handheld's USB-C port is a CH340C serial programming
+  bridge, and the ESP32-S3's native USB pins are already committed to the
+  touchscreen (see firmware/include/pins.h) — it can never present itself as a
+  drive to Home Base's computer. The only direct transfer path is the operator
+  physically removing the handheld's microSD card and inserting it into this
+  computer's card reader; Wi-Fi upload is the sole fallback. This was wrong
+  everywhere "USB" appeared — CONTEXT.md's workflow section, PROTOCOL.md's
+  photo-transfer prose, README.md's event-day steps, and the app itself:
+  - `TransferMethod.USB` → `TransferMethod.SD_CARD`. No migration needed —
+    verified by running `alembic revision --autogenerate` against the model
+    change and confirming it produced an empty upgrade/downgrade: this column
+    uses `native_enum=False` with no `create_constraint`, so it's a plain
+    string column with no DB-level constraint naming the old value.
+  - `services/usb_watcher.py` → `services/sd_card_watcher.py`
+    (`UsbWatcherThread` → `SdCardWatcherThread`); `services/usb_windows.py` →
+    `services/sd_card_windows.py`. The underlying Win32 mechanism is
+    unchanged and genuinely OS-level generic (`DRIVE_REMOVABLE` doesn't care
+    whether the media is an SD card or a USB flash drive) — only the naming,
+    which was actively misleading about what transport this system uses, was
+    wrong. `app/main.py` and `web/photos.py` updated to match.
+  - User-facing text now says plainly what to do: "Take the memory card out
+    of the handheld and put it in this computer," not "Plug the handheld
+    into USB (or insert its SD card)," which offered a nonexistent option.
+  - **The "done" import summary was restructured to lead with the plain
+    sentence CONTEXT.md's workflow implies: "N photos imported. M need
+    attention."** — consolidating unmatched + duplicate + error counts into
+    one "needs attention" figure, with the per-category pills kept below for
+    anyone who wants the breakdown. "Skipped" (an already-imported re-scan)
+    is relabeled "already imported," since a no-op re-scan needs no one's
+    attention — see photo_ingest.py's `_find_already_imported`.
+- **Per-car photo status added to the Cars table** (`services/cars.py::CarRow`
+  gained `has_car_photo`/`has_judge_sheet_photo`) — one batched query across
+  the whole roster's photos, not one query per row, since this table can hold
+  400+ cars. A `DUPLICATE` photo still counts as "present" for this column's
+  purpose (findability before the ceremony — something usable exists); the
+  separate question of which copy is canonical is /photos' job, tracked
+  independently. Rendered as a pill: "Both," "1 of 2," or — only once a car
+  is actually judged — "Missing" in the conflict/red color, since an unjudged
+  car having no photos yet isn't noteworthy but a judged one is.
+- **`tests/test_photo_ingest.py` written from scratch — no coverage existed
+  for the shared ingest path before this task**, despite it being exactly
+  the function both transports call into. Covers filename parsing
+  (case-insensitivity, `.jpeg`, embedded underscores), matched/duplicate/
+  unmatched outcomes, copy-never-move (the source file is asserted to still
+  exist after every ingest), thumbnail generation, idempotent re-scan, and
+  unmatched resolution (including its own idempotency). Uses `monkeypatch`
+  to point `photo_ingest.PHOTOS_DIR` at a `tmp_path` per test rather than
+  writing into the real photo store.
 - **POST /api/v1/sync brought fully into line with PROTOCOL.md — field names
   and shapes kept exactly as documented there, not the paraphrased
   terminology ("JudgingResult," "client_closed_at_uptime_ms,"

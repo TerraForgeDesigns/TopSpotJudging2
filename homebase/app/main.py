@@ -5,13 +5,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
 from app.config import APP_DIR, PHOTOS_DIR
-from app.services.usb_watcher import UsbWatcherThread
+from app.services.sd_card_watcher import SdCardWatcherThread
 from app.web import router as web_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    watcher = UsbWatcherThread()
+    watcher = SdCardWatcherThread()
     watcher.start()
     yield
     watcher.stop()

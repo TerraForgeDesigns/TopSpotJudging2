@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Car, JudgingSubmission, Show
+from app.models import Car, JudgingSubmission, Photo, PhotoStatus, PhotoType, Show
 from app.services.range_escalation import check_and_escalate
 from app.services.revisions import bump_show_data_revision
 from app.services.scoring import get_accepted_submission, submission_total
@@ -24,6 +24,8 @@ from app.services.scoring import get_accepted_submission, submission_total
 class CarRow:
     car: Car
     score: int | None  # None means not yet judged — never a phantom 0
+    has_car_photo: bool
+    has_judge_sheet_photo: bool
 
 
 def list_cars(db: Session, show_id: int) -> list[CarRow]:
@@ -35,10 +37,38 @@ def list_cars(db: Session, show_id: int) -> list[CarRow]:
             .order_by(Car.entry_number)
         )
     )
+
+    # One query for every car's photo coverage, rather than one query per
+    # row — this table can hold 400+ cars. A DUPLICATE photo still counts
+    # as "have one" for this purpose (see photo_ingest.py's get_car_photo,
+    # which falls back to a duplicate too) — what matters here is whether
+    # SOMETHING usable exists for the ceremony, not whether it needs
+    # resolving.
+    photo_rows = db.execute(
+        select(Photo.car_id, Photo.photo_type)
+        .where(
+            Photo.show_id == show_id,
+            Photo.car_id.is_not(None),
+            Photo.status.in_((PhotoStatus.MATCHED, PhotoStatus.DUPLICATE)),
+        )
+        .distinct()
+    ).all()
+    photo_types_by_car: dict[int, set[PhotoType]] = {}
+    for car_id, photo_type in photo_rows:
+        photo_types_by_car.setdefault(car_id, set()).add(photo_type)
+
     rows = []
     for car in cars:
         submission = get_accepted_submission(car)
-        rows.append(CarRow(car=car, score=submission_total(submission) if submission else None))
+        types = photo_types_by_car.get(car.id, set())
+        rows.append(
+            CarRow(
+                car=car,
+                score=submission_total(submission) if submission else None,
+                has_car_photo=PhotoType.CAR in types,
+                has_judge_sheet_photo=PhotoType.JUDGE_SHEET in types,
+            )
+        )
     return rows
 
 

@@ -59,8 +59,9 @@ work around it.
    home base's LAN IP ahead of time.
 4. Judges score cars through the day; handhelds sync scores opportunistically per the
    trigger model in PROTOCOL.md.
-5. After judging closes, connect each handheld to the laptop via USB (preferred) to
-   transfer photos, or fall back to WiFi upload if USB isn't available.
+5. After judging closes, take each handheld's microSD card out and put it in the
+   laptop (preferred) to transfer photos, or fall back to WiFi upload if the card
+   can't be read directly.
 6. Use home base to resolve any flagged conflicts, compute results, and run the
    awards presentation.
 

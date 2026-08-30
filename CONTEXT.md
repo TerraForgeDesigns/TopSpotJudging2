@@ -52,9 +52,12 @@ one repository so that protocol and design changes can be reviewed together.
 - **Scores sync over WiFi during the show**, opportunistically, whenever a handheld
   wanders back into range.
 - **Photos do not sync during the show.** They transfer only after judging closes,
-  via USB (preferred) or WiFi (fallback), while the handheld is plugged into power.
-  This is a deliberate choice: photo payloads are too large to fight for airtime with
-  score sync on a small travel router while judges are actively working.
+  by physically moving the handheld's microSD card into Home Base's computer
+  (preferred), or WiFi (fallback). The handheld cannot transfer photos over its USB
+  port — that port is a serial programming/charging bridge, not a data connection to
+  the microSD card, so there is no USB transfer path at all. This is also a
+  deliberate choice on the WiFi side: photo payloads are too large to fight for
+  airtime with score sync on a small travel router while judges are actively working.
 - After judging closes, the host uses Home Base to resolve any scoring conflicts (see
   PROTOCOL.md), compute final results (with tie-breaking — see below), choose winners
   for any award that needs a manual decision, and run an awards presentation that shows

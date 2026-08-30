@@ -3,14 +3,14 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Car, PhotoType
+from app.models import PhotoType
 from app.services import photo_import_status as status_service
+from app.services.cars import list_cars
 from app.services.photo_ingest import list_unmatched_photos, resolve_unmatched_photo
-from app.services.usb_watcher import list_removable_drives, scan_and_ingest_drive
+from app.services.sd_card_watcher import list_removable_drives, scan_and_ingest_drive
 from app.templating import templates
 from app.web.context import base_context, require_active_show
 
@@ -44,7 +44,7 @@ def photos_scan(db: Session = Depends(get_db)):
     drives = list_removable_drives()
     for drive in drives:
         threading.Thread(
-            target=scan_and_ingest_drive, args=(drive, str(drive)), daemon=True, name="usb-manual-scan"
+            target=scan_and_ingest_drive, args=(drive, str(drive)), daemon=True, name="sd-card-manual-scan"
         ).start()
     return RedirectResponse("/photos", status_code=303)
 
@@ -68,10 +68,7 @@ def photos_unmatched(request: Request, db: Session = Depends(get_db)):
 
     context = base_context(request, db, "/photos")
     context["groups"] = grouped
-    # No services/cars.py anymore (see DECISIONS.md — Cars UI is HB3) — this
-    # is the one place Photos still needs a car list, so it's inlined here
-    # rather than resurrecting that service for one read-only query.
-    context["cars"] = list(db.scalars(select(Car).where(Car.show_id == show.id).order_by(Car.entry_number)))
+    context["cars"] = [row.car for row in list_cars(db, show.id)]
     return templates.TemplateResponse(request, "photos/unmatched.html", context)
 
 

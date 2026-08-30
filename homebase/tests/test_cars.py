@@ -7,7 +7,20 @@ from datetime import date, datetime, timezone
 import pytest
 from sqlalchemy import select
 
-from app.models import Car, CarStatus, Handheld, JudgingCategory, JudgingScore, JudgingSubmission, Show, SubmissionStatus
+from app.models import (
+    Car,
+    CarStatus,
+    Handheld,
+    JudgingCategory,
+    JudgingScore,
+    JudgingSubmission,
+    Photo,
+    PhotoStatus,
+    PhotoType,
+    Show,
+    SubmissionStatus,
+    TransferMethod,
+)
 from app.services.cars import add_cars, get_car, list_cars, update_car_details
 
 
@@ -50,6 +63,72 @@ def test_list_cars_includes_score_for_judged_car(db_session, show):
 
     rows = list_cars(db_session, show.id)
     assert rows[0].score == 4
+
+
+def test_list_cars_photo_status_defaults_to_neither(db_session, show):
+    car = Car(show_id=show.id, entry_number="001", data_revision_at_change=1)
+    db_session.add(car)
+    db_session.commit()
+
+    rows = list_cars(db_session, show.id)
+    assert rows[0].has_car_photo is False
+    assert rows[0].has_judge_sheet_photo is False
+
+
+def test_list_cars_photo_status_reflects_matched_photos(db_session, show):
+    car = Car(show_id=show.id, entry_number="001", data_revision_at_change=1)
+    db_session.add(car)
+    db_session.flush()
+    db_session.add(
+        Photo(
+            show_id=show.id, car_id=car.id, entry_number="001", photo_type=PhotoType.CAR,
+            status=PhotoStatus.MATCHED, transfer_method=TransferMethod.SD_CARD,
+            file_path="x/car.jpg", original_filename="001_car.jpg",
+        )
+    )
+    db_session.commit()
+
+    rows = list_cars(db_session, show.id)
+    assert rows[0].has_car_photo is True
+    assert rows[0].has_judge_sheet_photo is False
+
+
+def test_list_cars_photo_status_counts_a_duplicate_as_present(db_session, show):
+    """A DUPLICATE still means "something usable exists" for the Cars
+    table's findability purpose — it just also needs the host to resolve
+    which copy is canonical, tracked separately on /photos."""
+    car = Car(show_id=show.id, entry_number="001", data_revision_at_change=1)
+    db_session.add(car)
+    db_session.flush()
+    db_session.add(
+        Photo(
+            show_id=show.id, car_id=car.id, entry_number="001", photo_type=PhotoType.JUDGE_SHEET,
+            status=PhotoStatus.DUPLICATE, transfer_method=TransferMethod.SD_CARD,
+            file_path="x/judge_sheet_duplicate.jpg", original_filename="001_sheet.jpg",
+        )
+    )
+    db_session.commit()
+
+    rows = list_cars(db_session, show.id)
+    assert rows[0].has_judge_sheet_photo is True
+
+
+def test_list_cars_photo_status_ignores_unmatched_photos_of_other_cars(db_session, show):
+    car = Car(show_id=show.id, entry_number="001", data_revision_at_change=1)
+    db_session.add(car)
+    db_session.commit()
+    # An unmatched photo has car_id=None — must never be attributed to any row.
+    db_session.add(
+        Photo(
+            show_id=show.id, car_id=None, entry_number="999", photo_type=PhotoType.CAR,
+            status=PhotoStatus.UNMATCHED, transfer_method=TransferMethod.SD_CARD,
+            file_path="x/unmatched.jpg", original_filename="999_car.jpg",
+        )
+    )
+    db_session.commit()
+
+    rows = list_cars(db_session, show.id)
+    assert rows[0].has_car_photo is False
 
 
 def test_update_car_details_never_touches_entry_number(db_session, show):

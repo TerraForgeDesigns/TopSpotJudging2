@@ -217,11 +217,14 @@ is HB5's job, not built yet — see DECISIONS.md.
 
 `multipart/form-data` fields: `entry_number`, `photo_type`, `file`.
 
-This is the **WiFi fallback path** for photo transfer, used only when USB transfer
-isn't available post-judging. It shares the same server-side ingest logic as the USB
-path — both end up writing the same file naming convention (below) into the same photo
-store, so home base doesn't need to know or care which transport a given photo arrived
-through.
+This is the **WiFi fallback path** for photo transfer, used only when the handheld's
+microSD card can't be read directly on Home Base's computer post-judging. There is no
+USB transfer path at all — the handheld's USB-C port is a CH340C serial programming
+bridge, and the ESP32-S3's native USB pins are already committed to the touchscreen
+(see firmware/include/pins.h), so it can never present itself as a drive. This endpoint
+shares the same server-side ingest logic as the SD card path — both end up writing the
+same file naming convention (below) into the same photo store, so home base doesn't
+need to know or care which transport a given photo arrived through.
 
 ## Handheld sync trigger model
 
@@ -254,7 +257,7 @@ The routine, run on either trigger:
 
 This is how photos find their car — it's the only linkage between a photo file and a
 car record, so it must be followed exactly by firmware and by home base's ingest logic
-on both transports (USB and WiFi upload).
+on both transports (SD card and WiFi upload).
 
 ```
 {entry_number}_car.jpg
@@ -264,5 +267,5 @@ on both transports (USB and WiFi upload).
 - `_car.jpg` — photo of the car itself.
 - `_sheet.jpg` — photo of the paper judge sheet for that car.
 
-Stored on the handheld's SD card during judging; matched by home base on ingest,
-regardless of which transport (USB or WiFi) delivered the file.
+Stored on the handheld's microSD card during judging; matched by home base on ingest,
+regardless of which transport (SD card or WiFi) delivered the file.

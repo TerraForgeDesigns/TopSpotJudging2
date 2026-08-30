@@ -42,7 +42,7 @@ class PhotoType(str, enum.Enum):
 class PhotoStatus(str, enum.Enum):
     MATCHED = "matched"  # normal case: resolved to a car, no conflict
     DUPLICATE = "duplicate"  # car+type slot was already filled — both kept, host resolves
-    # Photos still arrive by filename (USB/WiFi), independent of the
+    # Photos still arrive by filename (SD card/Wi-Fi), independent of the
     # pre-generated entry roster, so a typo'd or stale entry_number in a
     # photo filename can still miss — unlike submissions (see
     # SubmissionStatus above), this UNMATCHED case is unchanged.
@@ -50,7 +50,14 @@ class PhotoStatus(str, enum.Enum):
 
 
 class TransferMethod(str, enum.Enum):
-    USB = "usb"
+    """The handheld cannot present itself as a USB drive — its USB-C is a
+    CH340C serial bridge, and the ESP32-S3's native USB pins are already
+    used by the touchscreen (see firmware/include/pins.h). Photos always
+    arrive by physically moving the microSD card into this computer; Wi-Fi
+    upload is the only fallback. There has never been a USB transfer path
+    for photos — see DECISIONS.md."""
+
+    SD_CARD = "sd_card"
     WIFI = "wifi"
 
 
