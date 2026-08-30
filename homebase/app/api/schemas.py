@@ -82,6 +82,10 @@ class NominationOptionOut(BaseModel):
 class ConfigurationOut(BaseModel):
     show_name: str
     score_range_max: int
+    # Computed server-side (active categories x score_range_max) so a
+    # handheld never derives it independently and never disagrees with
+    # Home Base — see CONTEXT.md's Max Score definition and PROTOCOL.md.
+    max_score: int
     overall_impression_enabled: bool
     categories: list[CategoryOut]
     judge_chosen_awards: list[NominationOptionOut] = Field(default_factory=list)
@@ -104,9 +108,11 @@ class SyncResponse(BaseModel):
     data_revision: int
     configuration: ConfigurationOut | None
     cars: list[CarOut]
-    # Approved vehicle names — full semantics deferred to a not-yet-written
-    # spec referred to elsewhere as "SPEC-C". This field's presence in the
-    # contract is settled; its content is not. See PROTOCOL.md/DECISIONS.md.
+    # Approved vehicle names — full semantics defined by SPEC-B (the
+    # master build guide's three-layer vehicle database, review queue,
+    # and vehicle_additions spec), not yet implemented here (HB5 builds
+    # the services). This field's presence in the contract is settled;
+    # its behavior isn't wired up yet. See PROTOCOL.md/DECISIONS.md.
     vehicle_additions: list[dict] = Field(default_factory=list)
     results: list[ResultItem]
     summary: ProtocolSummary

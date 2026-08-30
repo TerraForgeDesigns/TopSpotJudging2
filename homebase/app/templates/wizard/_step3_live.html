@@ -37,7 +37,8 @@
 
   <section class="section">
     <h2 class="section__title">If two cars tie, which category should decide?</h2>
-    <p class="section__desc">The first category listed is compared first, then the next, and so on.</p>
+    <p class="section__desc">The first category listed is compared first, then the next, and so on.
+      This order also sets what judges see on the handheld — dragging to change one changes both.</p>
     {% if active_categories %}
     <div data-drag-list data-drag-order-input="priority-order-input" class="stack" style="max-width: 400px;">
       {% for category in active_categories %}

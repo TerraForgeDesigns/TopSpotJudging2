@@ -1,10 +1,11 @@
 """
-The vehicle make/model vocabulary — see CONTEXT.md and DECISIONS.md
-("SPEC-C", not yet written, is what fully specifies how these get used).
-Models only, per this task's scope — the services that populate,
-prepare, and review these live in HB5. Defined now purely so the single
-initial migration (see DECISIONS.md) covers the complete schema and a
-second migration isn't needed a few prompts from now.
+The vehicle make/model vocabulary — see CONTEXT.md and DECISIONS.md.
+SPEC-B, in the master build guide, is what fully specifies how these get
+used (the three-layer vehicle database, the review queue, and
+vehicle_additions). Models only, per this task's scope — the services
+that populate, prepare, and review these live in HB5. Defined now purely
+so the single initial migration (see DECISIONS.md) covers the complete
+schema and a second migration isn't needed a few prompts from now.
 
 `source` on VehicleMake/VehicleModel is load-bearing, not decorative: it
 keeps names a real judge typed in at a real show (LEARNED) permanently

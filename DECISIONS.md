@@ -7,6 +7,76 @@ building on top of it. Newest entries at the top of each section.
 
 ## Decided
 
+- **HB2 review fixes (six, applied together — see each for detail):**
+  1. **`check_and_escalate()` no longer commits — the caller does, matching
+     `services/revisions.py`'s existing contract, which it had been silently
+     violating.** The bug this caused: nothing currently calls
+     `check_and_escalate()` in production, but the moment something does (Add
+     Cars: create entries, bump `show_data_revision`, escalate, as one
+     all-or-nothing operation), escalation's own internal commit would lock in
+     the car-adds and the revision bump regardless of whether a later step in
+     that same logical operation failed — a rollback after that point does
+     nothing, because there's nothing left uncommitted to roll back. Fixed by
+     deleting the `db.commit()` call; `tests/test_range_escalation.py`'s
+     callers now commit explicitly, and a new test
+     (`test_failure_after_escalation_leaves_no_partial_state`) simulates
+     exactly this failure mode and asserts nothing survives it — no cars, no
+     revision bump, no escalation.
+  2. **Turning a Judging Category ON is now blocked once any car in the show
+     has been judged, symmetric to the existing OFF-with-scores block.**
+     New `services/judging_category_rules.py` (`can_activate_category`,
+     `can_deactivate_category`) — pure guard functions, no caller yet since
+     post-creation category management isn't built (see the `/criteria`
+     stub), written now so the rule is correct and tested before that screen
+     exists rather than bolted on after. The activation check keys off
+     whether the SHOW has judged cars, not whether the category itself has
+     scores — a category that was off has no scores of its own, but that's
+     exactly the problem, not evidence it's safe to turn on. Also:
+     `scoring.py::build_ranking_key` no longer defaults a missing active-
+     category score to 0 — it raises `MissingCategoryScoreError`. A 0-default
+     was silently ranking a car as if it scored the worst possible in a
+     category it was never asked about, indistinguishable in the output from
+     a car that was actually judged and scored badly; CONTEXT.md is explicit
+     that there's no such thing as a 0 or "not applicable" for an active
+     category, so pretending one exists is worse than raising. Both
+     directions tested in `tests/test_judging_category_rules.py`.
+  3. **`ConfigurationOut.max_score` added, computed server-side as active
+     categories × `score_range_max`.** Before this, a handheld had
+     `score_range_max` and the category list but would have had to compute
+     Max Score itself — two independent implementations of the same formula
+     (CONTEXT.md's) that could drift out of sync with no way to detect it.
+     PROTOCOL.md's `configuration` section gained a literal JSON example
+     (it previously only described the shape in prose).
+  4. **`JudgingCategory.sort_order` doing double duty as both display order
+     and tie-break priority order (decided silently during the original
+     ranking-kernel build) is now written down as a decision, not left
+     implicit.** Trade-off, stated explicitly for the first time: an
+     organiser cannot have a category display third to judges but break ties
+     first — reordering one always reorders the other, because they're the
+     same stored value. Accepted as a reasonable simplification — now stated
+     directly in `models/category.py`'s docstring, not just here — but a
+     real trade-off, and organisers dragging the
+     Judging Setup reorder control for one reason must not be surprised that
+     it silently changed the other. The wizard's Step 3 now says so directly:
+     "This order also sets what judges see on the handheld — dragging to
+     change one changes both."
+  5. **`Show.status` (`setup` / `judging` / `finished`) added now, while the
+     HB1 baseline migration is still the only structural one that mattered —
+     see the schema-status note below.** Column default is `setup`;
+     `services/show_wizard.py::materialize()` sets it straight to `judging`
+     the moment a real Show exists, since the wizard itself IS the setup
+     phase — there is no separate post-wizard "setup" state for a show that
+     was just created. The `judging` → `finished` transition (HB7's
+     finish-show gate) is explicitly NOT built here — only the column and
+     the setup→judging move.
+  6. **The vehicle-database spec is SPEC-B, in the master build guide — not
+     "SPEC-C."** Every reference to a "not-yet-written SPEC-C"
+     (`api/schemas.py`, `models/vehicle.py`, PROTOCOL.md, and this file's own
+     Open section) was simply wrong about which document defines
+     `vehicle_additions` — SPEC-B already exists and fully specifies the
+     three-layer vehicle database, the review queue, and this field.
+     Corrected everywhere; see Open, below, for what's still actually
+     unbuilt (the HB5 services, not the spec).
 - **Early-scaling nudge on the Number of Cars wizard step exists because
   score conversion is lossy in a specific, non-obvious way: it coarsens
   resolution, it doesn't add it.** A car judged at 1-5 and later scaled to
@@ -422,20 +492,15 @@ building on top of it. Newest entries at the top of each section.
   nomination, no Top Awards). This spec-rewrite session made no app code changes per
   its own instructions — all of the above still reflects the pre-Aug-2026 design until
   a future prompt rebuilds it.
-- **`vehicle_additions` / approved vehicle names ("SPEC-C") is referenced but not yet
-  specified.** The Aug 2026 spec update names `make_manually_entered` /
-  `model_manually_entered` on a submission and a `vehicle_additions` field in the sync
-  response, pointing at a controlled make/model vocabulary spec that hasn't been
-  written yet. PROTOCOL.md documents the field's presence in the wire contract; its
-  actual semantics (what makes an addition "approved," how it propagates back to
-  handhelds) are undefined until that spec arrives.
-- **Exact field-level shape of the `configuration` object in `POST /api/v1/sync`'s
-  response is inferred, not dictated.** PROTOCOL.md lists what it must logically carry
-  (active Judging Categories with names/priority order, current score range, Overall
-  Impression enabled flag, judge-chosen Show Awards for nomination) based on what
-  handhelds need to render judging correctly, but the Aug 2026 spec update didn't give
-  a field-by-field schema. Nail this down in the implementation prompt that builds the
-  new sync endpoint.
+- **`vehicle_additions` / approved vehicle names — the spec is SPEC-B, in the master
+  build guide, not "SPEC-C."** An earlier session referred to this as a "not-yet-written
+  SPEC-C" — that was wrong, not just a placeholder name: SPEC-B already exists and
+  fully defines the three-layer vehicle database, the review queue, and
+  `vehicle_additions`. Corrected everywhere it was misnamed (`api/schemas.py`,
+  `models/vehicle.py`, PROTOCOL.md) as part of the HB2 review fixes — see Decided,
+  below. What's still open is only implementation: the tables exist
+  (`app/models/vehicle.py`), but the services that populate, prepare, and review them
+  are HB5's job, not built yet.
 - **How an entry number physically reaches a car in the field is unspecified.** The
   old workflow had a pre-printed paper registration form; the new one only specifies
   that Home Base generates entry numbers 001..N at show creation. Whether that means

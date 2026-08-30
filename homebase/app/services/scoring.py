@@ -31,6 +31,18 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Car, JudgingCategory, JudgingSubmission, Show, SubmissionStatus
 
 
+class MissingCategoryScoreError(RuntimeError):
+    """Raised by build_ranking_key() when an active category has no score
+    on a submission that otherwise has an accepted score set. This should
+    be prevented upstream (services/judging_category_rules.py blocks
+    activating a category once any car is judged) — seeing this means
+    that guard was bypassed, or a category was activated through some
+    other path. Never silently treat a missing score as 0: CONTEXT.md is
+    explicit that there is no zero and no "not applicable" for an active
+    category, and a car ranked as if it scored 0 in a category it was
+    never even asked about is a silently wrong ranking, not a real one."""
+
+
 def get_accepted_submission(car: Car) -> JudgingSubmission | None:
     for submission in car.submissions:
         if submission.status == SubmissionStatus.ACCEPTED:
@@ -106,7 +118,12 @@ def build_ranking_key(
         key.append(submission.overall_impression_adjusted_points or 0)
     scores_by_category_id = {score.category_id: score.adjusted_points for score in submission.scores}
     for category in categories_in_priority_order:
-        key.append(scores_by_category_id.get(category.id, 0))
+        if category.id not in scores_by_category_id:
+            raise MissingCategoryScoreError(
+                f"Submission {submission.id} (car {submission.car_id}) has no score for "
+                f"active category '{category.name}' (id={category.id})."
+            )
+        key.append(scores_by_category_id[category.id])
     return tuple(key)
 
 

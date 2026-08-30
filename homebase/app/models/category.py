@@ -11,7 +11,13 @@ class JudgingCategory(Base):
     whether a category counts toward Max Score and appears on handhelds.
     `sort_order` does double duty as the organiser's category priority
     order for tie-breaking (CONTEXT.md's tie-break cascade, step 3) — the
-    same ordering concept, reused rather than duplicated.
+    same ordering concept, reused rather than duplicated. This is a real
+    trade-off, not a free simplification: an organiser cannot have a
+    category display third to judges but break ties first, since
+    reordering one always reorders the other. Accepted deliberately — see
+    DECISIONS.md — but anything that lets an organiser drag this order
+    (the wizard's Judging Setup step, and any future post-creation
+    editor) must say plainly that it changes both.
 
     No `max_points` (the old model had one) — the range is automatic and
     show-wide, not per-category; see Show.score_range_max. No

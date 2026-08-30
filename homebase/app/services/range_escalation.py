@@ -42,7 +42,14 @@ def check_and_escalate(db: Session, show: Show) -> bool:
     escalates if that target is higher than the show's current range.
     Returns True if an escalation happened, False otherwise (including
     when the target is lower or equal — the range never lowers, and a
-    call that changes nothing is a safe, cheap no-op, i.e. idempotent)."""
+    call that changes nothing is a safe, cheap no-op, i.e. idempotent).
+
+    Mutates and flushes but does NOT commit — same contract as
+    services/revisions.py, which this function calls into. Escalation is
+    almost always one step of a larger transaction (e.g. Add Cars: create
+    entries, bump show_data_revision, escalate, all-or-nothing) — a
+    commit here would make that impossible to roll back as a unit. The
+    caller commits. See DECISIONS.md."""
     car_count = db.scalar(select(func.count(Car.id)).where(Car.show_id == show.id)) or 0
     target = range_max_for_car_count(car_count)
 
@@ -71,5 +78,4 @@ def check_and_escalate(db: Session, show: Show) -> bool:
         )
 
     bump_configuration_revision(db, show)
-    db.commit()
     return True

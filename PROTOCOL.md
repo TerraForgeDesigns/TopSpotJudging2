@@ -122,9 +122,31 @@ that could be wrong before the first sync of the day.
 
 `configuration`, when present, carries whatever a handheld needs to render judging
 correctly: the active Judging Categories (with names and priority order), the show's
-current score range, whether Overall Impression is enabled, and the judge-chosen Show
-Awards available for nomination. The exact field-level shape isn't fixed by this
-document yet — see DECISIONS.md's open item — but this is the content it must carry.
+current score range, the show's Max Score, whether Overall Impression is enabled, and
+the judge-chosen Show Awards available for nomination:
+
+```jsonc
+{
+  "show_name": "Top Spot Autumn Cruise-In",
+  "score_range_max": 10,
+  "max_score": 40,                          // active categories x score_range_max —
+                                             // computed by Home Base, never by the
+                                             // handheld, so the two can never disagree
+  "overall_impression_enabled": false,
+  "categories": [
+    { "id": 1, "name": "Engine", "sort_order": 0 },
+    { "id": 2, "name": "Exterior", "sort_order": 1 },
+    { "id": 3, "name": "Interior", "sort_order": 2 },
+    { "id": 4, "name": "Paint", "sort_order": 3 }
+    // a 5th category, Wheels / Tires, is inactive for this show and so
+    // does not appear here — inactive categories are never sent
+  ],
+  "judge_chosen_awards": [
+    { "id": 12, "name": "Best Paint" },
+    { "id": 15, "name": "Best Engine" }
+  ]
+}
+```
 
 #### score_range_max is mandatory on every submission
 
@@ -160,8 +182,10 @@ timestamp using its own clock at receipt.
 `vehicle_additions` in the response, point at a controlled make/model vocabulary —
 approved vehicle names a handheld can offer instead of free text. The full semantics
 (what makes an addition "approved," how it propagates back out to other handhelds)
-belong to a not-yet-written specification referred to elsewhere as "SPEC-C." This
-document only commits to the field's presence in the wire contract; see DECISIONS.md.
+are defined by SPEC-B, in the master build guide (the three-layer vehicle database,
+review queue, and vehicle_additions spec) — not yet implemented (HB5 builds the
+services; see `app/models/vehicle.py`, which already has the tables). This document
+only commits to the field's presence in the wire contract; see DECISIONS.md.
 
 ### `POST /api/v1/photos/upload`
 

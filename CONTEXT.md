@@ -219,6 +219,12 @@ explanation, never a technical error:
 
 - Manually changing the score range (moot anyway — it's automatic).
 - Turning off a Judging Category that already has scores against it.
+- Turning ON a Judging Category once any car in the show has been judged. This runs the
+  other direction of the same rule: judging cars without a category and then switching
+  it on leaves those cars permanently missing a score for it, not zero and not
+  "not applicable" — there is no way to go back and score them for it later. Home Base
+  says so plainly: "Cars have already been judged without Paint. Adding it now would
+  leave those cars unscored in that category."
 
 Always allowed, at any point: adding cars, adding awards, renaming awards or
 categories, choosing winners, correcting participant/vehicle details, and changing

@@ -109,3 +109,17 @@ def test_stale_score_range_max_is_converted_on_receipt(client, db_session, show_
     assert score.original_points == 3
     assert score.original_range_max == 5
     assert score.adjusted_points == 6  # double the original — 3 * 10/5
+
+
+def test_configuration_carries_a_server_computed_max_score(client, db_session, show_with_car):
+    """HB2 review fix: a handheld must never derive Max Score itself —
+    Home Base computes it (active categories x score_range_max) and
+    sends it directly. See PROTOCOL.md's configuration example."""
+    show, category, car = show_with_car  # one active category ("Engine"), default score_range_max=5
+
+    result = _submit(client, "hh-1", "001", closed_at_uptime_ms=1000, category_id=category.id, points=3)
+
+    configuration = result["configuration"]
+    assert configuration is not None
+    assert configuration["score_range_max"] == 5
+    assert configuration["max_score"] == 5  # 1 active category x 5

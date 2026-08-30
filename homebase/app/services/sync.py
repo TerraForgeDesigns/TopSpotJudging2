@@ -87,6 +87,7 @@ def get_configuration(db: Session, show: Show) -> ConfigurationOut:
     return ConfigurationOut(
         show_name=show.name,
         score_range_max=show.score_range_max,
+        max_score=len(categories) * show.score_range_max,
         overall_impression_enabled=show.overall_impression_enabled,
         categories=[CategoryOut(id=c.id, name=c.name, sort_order=c.sort_order) for c in categories],
         judge_chosen_awards=[NominationOptionOut(id=a.id, name=a.name) for a in judge_chosen_awards],

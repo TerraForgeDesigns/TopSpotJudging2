@@ -5,10 +5,12 @@ coverage on: wizard state surviving Back, Max Score correctness across
 every range/active-category combination, and materialize() producing
 exactly the right, correctly-numbered entries.
 """
+from datetime import date
+
 import pytest
 from sqlalchemy import select
 
-from app.models import Award, Car, JudgingCategory, Show, ShowDraft
+from app.models import Award, Car, JudgingCategory, Show, ShowDraft, ShowStatus
 from app.services import show_wizard
 
 
@@ -161,6 +163,21 @@ def test_materialize_deletes_the_draft_and_activates_the_show(db_session):
     from app.services.shows import get_active_show
 
     assert get_active_show(db_session).id == show.id
+
+
+def test_new_show_defaults_to_setup_status_but_materialize_moves_to_judging(db_session):
+    bare_show = Show(name="Untouched", event_date=date(2026, 9, 15))
+    db_session.add(bare_show)
+    db_session.commit()
+    assert bare_show.status == ShowStatus.SETUP
+
+    draft = ShowDraft(data=show_wizard.new_draft_data())
+    draft.data = {**draft.data, "name": "Wizard Show", "event_date": "2026-09-15", "car_count": 10, "top_awards_count": 10}
+    db_session.add(draft)
+    db_session.commit()
+
+    show = show_wizard.materialize(db_session, draft)
+    assert show.status == ShowStatus.JUDGING
 
 
 def test_materialize_creates_categories_and_awards_matching_the_draft(db_session):

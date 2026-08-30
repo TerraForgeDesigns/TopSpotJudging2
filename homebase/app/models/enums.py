@@ -1,6 +1,20 @@
 import enum
 
 
+class ShowStatus(str, enum.Enum):
+    """See DECISIONS.md — added ahead of HB7's finish-show gate so it
+    doesn't need a second migration on top of HB1's clean baseline.
+    materialize() (services/show_wizard.py) moves a new show straight
+    from the column default SETUP to JUDGING the moment it's created —
+    the wizard IS the setup phase, so there's nothing left in SETUP by
+    the time a real Show row exists. The JUDGING -> FINISHED transition
+    is HB7's finish-show gate, not built here."""
+
+    SETUP = "setup"
+    JUDGING = "judging"
+    FINISHED = "finished"
+
+
 class CarStatus(str, enum.Enum):
     UNJUDGED = "unjudged"
     JUDGED = "judged"

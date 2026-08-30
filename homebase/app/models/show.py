@@ -1,9 +1,10 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, utcnow
+from app.models.enums import ShowStatus
 
 
 class Show(Base):
@@ -28,6 +29,12 @@ class Show(Base):
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    status: Mapped[ShowStatus] = mapped_column(
+        Enum(ShowStatus, native_enum=False, validate_strings=True, length=16),
+        default=ShowStatus.SETUP,
+        nullable=False,
+    )
 
     score_range_max: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     overall_impression_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

@@ -17,7 +17,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models import Award, Car, JudgingCategory, Show, ShowDraft
-from app.models.enums import AwardRankingBasis
+from app.models.enums import AwardRankingBasis, ShowStatus
 from app.services.range_escalation import TIER_THRESHOLDS, range_max_for_car_count
 from app.services.shows import set_active_show
 
@@ -369,6 +369,7 @@ def materialize(db: Session, draft: ShowDraft) -> Show:
         event_date=date.fromisoformat(data["event_date"]),
         location=data["location"] or None,
         notes=data["notes"] or None,
+        status=ShowStatus.JUDGING,  # the wizard IS the setup phase — see DECISIONS.md
         score_range_max=range_max,
         overall_impression_enabled=data["overall_impression_enabled"],
         top_awards_count=data["top_awards_count"],
