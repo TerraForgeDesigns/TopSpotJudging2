@@ -222,6 +222,85 @@ environment can confirm.
    M" for a realistic batch size, not just that the mechanism works for one
    photo.
 
+## Power management (F7)
+
+Nothing here can be exercised in this environment — no board, no meter, no battery
+to actually drain. Every procedure below needs a real handheld; this section exists
+so the numbers the user asked for can actually be produced, not guessed.
+
+### Backlight PWM floor — confirm zero really means zero
+
+Code reading confirms `display::setBacklight(0)` writes a true 0% duty cycle (see
+`power/backlight.cpp`'s header comment — LovyanGFX's `Light_PWM::setBrightness()`
+skips its offset/floor math entirely when `brightness == 0`) — this is a source
+read, not a hardware measurement. To actually confirm on a real board:
+
+1. Let the screen sit idle past `backlightOffSeconds` (default 60s, or lower it via
+   Settings for a faster test).
+2. Multimeter in DC voltage mode across the backlight LED string (or, more directly,
+   a scope on GPIO2 itself) — confirm it reads ~0V / a flat 0% duty, not a dim
+   residual glow or a nonzero floor voltage.
+3. Touch the screen — confirm it returns to full brightness immediately (no
+   perceptible delay, since touch was being polled the whole time — see
+   `power/backlight.h`'s header comment for why no separate "wake" path exists).
+
+### WiFi radio genuinely off — a measured number, not a guess
+
+1. Break the circuit in series with the battery — easiest at the JST connector
+   (a JST-to-breadboard breakout, or carefully splitting one lead) — and put a
+   multimeter in DC current mode in series, starting on a ~200mA range (step down
+   if the reading is small enough to read more precisely on a lower range).
+2. **Baseline**: let the device sit idle for at least 10 seconds after any sync
+   attempt has clearly finished (watch the status bar settle to "Up to Date" or
+   "Not Connected"). Record this current.
+3. **During a sync window**: tap Update Now on Home screen (a reliable, repeatable
+   way to trigger one) and read current WHILE it's actively associated/POSTing —
+   record the peak.
+4. **After**: wait 2 seconds past the attempt completing, read current again.
+5. **What a good result looks like**: (2) and (4) should be flat and equal — the
+   radio truly idle in both. (3) should be visibly elevated only for the attempt's
+   real duration. **What a bad result looks like**: if (4) stays elevated above (2)
+   indefinitely (not just for a couple seconds after the attempt), `WiFi.mode
+   (WIFI_OFF)` isn't actually taking effect on this board/framework version — worth
+   filing as a real bug, not tuning around.
+
+### Desk test: estimating real battery life before trusting it at a show
+
+A simulated show, run on a real handheld, battery starting from a full charge:
+
+1. **Pick a car count** from the task's stated range — run this once at the LOW end
+   (25 cars — idle-dominated, closest to the worst case for backlight-timeout
+   tuning) and once at the HIGH end (130 cars — activity-dominated) if time allows;
+   the low end matters more since idle time is where backlight timeouts have the
+   most leverage.
+2. **Script a realistic mix** per car: Enter Car → Vehicle Details → Judge Car
+   (score every active category) → Award Nominations → two photo captures → Review
+   → Confirm, THEN an idle gap before the next car (long enough to actually reach
+   the off-backlight state — at least `backlightOffSeconds` + a buffer, e.g. 90s at
+   defaults) to represent a judge walking to the next car. Let the natural
+   post-Confirm sync attempt happen; also throw in a couple of manual Update Now
+   taps and at least one full Send Photos over Wi-Fi batch partway through, since
+   both cost real power the per-car loop alone wouldn't capture.
+3. **What to measure**: wall-clock start time and a battery reading at both ends —
+   voltage via a multimeter across the JST pins (simplest, no firmware dependency),
+   or `battery::estimatePercent()` via Diagnostics if `PIN_BATTERY_ADC` has been
+   confirmed and wired up by the time this runs. Compute either a direct
+   percent-per-hour drain rate, or better, time how long it takes to drop a
+   meaningful, repeatable amount (e.g. 10%) and extrapolate linearly to a full
+   6-10 hour show day (LiPo discharge isn't perfectly linear, but it's a reasonable
+   first estimate — flag it as an estimate, not a guarantee).
+4. **What a bad result means**: if the LOW-car-count run's extrapolated runtime
+   falls short of 6 hours (the low end of a real show day), that's a real signal —
+   and which direction to look depends on WHERE the power went. If the device spent
+   most of its time in the backlight-off state and still drained fast, the
+   RGB-DMA-always-on cost (this task's own point 1 — the panel can't idle the way an
+   SPI display can) is likely the dominant term, and only a real display-power-down
+   path (the deep-sleep design this task deliberately deferred — see DECISIONS.md's
+   F7 entry) will meaningfully fix it, not further backlight-timeout tuning. If the
+   device spent a lot of time at FULL brightness (backlight timeouts too long, or a
+   judge who's genuinely active most of the time), tightening
+   `backlightDimSeconds`/`backlightOffSeconds` is the first thing to try.
+
 ## Non-crash-safety checks
 
 Each bring-up target's own header comment (`bringup_display.cpp`,

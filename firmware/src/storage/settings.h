@@ -30,6 +30,13 @@ struct Settings {
     // this in whole minutes (1-15); stored here in seconds to match
     // storage::SyncState::currentRetryIntervalSeconds' own unit.
     int syncIntervalSeconds = 180;
+    // Backlight idle timers — see power/backlight.h. Task's own default
+    // numbers (30s dim, 60s off), stored/exposed in seconds directly
+    // (unlike syncIntervalSeconds' minutes — these are short enough that
+    // fractional minutes would be awkward). Both configurable; the
+    // Settings screen validates dim < off, both > 0.
+    int backlightDimSeconds = 30;
+    int backlightOffSeconds = 60;
 };
 
 // Loads /settings.txt. Missing/unreadable/malformed lines are never a

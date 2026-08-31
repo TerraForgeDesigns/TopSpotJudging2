@@ -20,6 +20,15 @@ namespace ui::screens {
 
 namespace {
 
+// Module-static, not a build()-local — the row callbacks below fire
+// later, asynchronously, after build() has already returned. A pointer
+// into a stack-local Settings would be dangling by the time a judge
+// actually taps a row; this instead lives for as long as the firmware
+// runs (screen_manager's one-screen-at-a-time design means only one
+// Settings screen is ever alive to read or write it). Declared first so
+// every validator/handler below it can reference it directly.
+storage::Settings g_settings;
+
 // Which field a tap on a row is editing — passed through the keyboard
 // overlay's void* ctx since it (like every F2 component) is a plain C
 // callback, not a capturing lambda.
@@ -38,13 +47,25 @@ bool isValidSyncInterval(const char* text) {
     return minutes >= MIN_SYNC_INTERVAL_MINUTES && minutes <= MAX_SYNC_INTERVAL_MINUTES;
 }
 
-// Module-static, not a build()-local — the row callbacks below fire
-// later, asynchronously, after build() has already returned. A pointer
-// into a stack-local Settings would be dangling by the time a judge
-// actually taps a row; this instead lives for as long as the firmware
-// runs (screen_manager's one-screen-at-a-time design means only one
-// Settings screen is ever alive to read or write it).
-storage::Settings g_settings;
+// power/backlight.h's two timeouts — task's own defaults 30/60, both
+// configurable. Bounds are generous (5s-300s) but real: dim must always
+// be strictly before off, and neither can be zero/instant.
+constexpr int MIN_BACKLIGHT_SECONDS = 5;
+constexpr int MAX_BACKLIGHT_SECONDS = 300;
+
+bool isValidBacklightDim(const char* text) {
+    if (text[0] == '\0') return false;
+    int seconds = atoi(text);
+    return seconds >= MIN_BACKLIGHT_SECONDS && seconds <= MAX_BACKLIGHT_SECONDS &&
+           seconds < g_settings.backlightOffSeconds;
+}
+
+bool isValidBacklightOff(const char* text) {
+    if (text[0] == '\0') return false;
+    int seconds = atoi(text);
+    return seconds >= MIN_BACKLIGHT_SECONDS && seconds <= MAX_BACKLIGHT_SECONDS &&
+           seconds > g_settings.backlightDimSeconds;
+}
 
 void onFieldSaved(void* ctx, const char* text, bool accepted) {
     if (!accepted) return;
@@ -88,6 +109,34 @@ void onEditSyncInterval(void* /*ctx*/) {
     snprintf(current, sizeof(current), "%d", g_settings.syncIntervalSeconds / 60);
     components::numericKeypadOverlay(current, "Minutes", /*maxLen=*/2, /*autoAcceptLen=*/0, isValidSyncInterval,
                                       "Enter 1 to 15 minutes.", onSyncIntervalSaved, nullptr);
+}
+
+void onBacklightDimSaved(void* /*ctx*/, const char* text, bool accepted) {
+    if (!accepted) return;
+    g_settings.backlightDimSeconds = atoi(text);
+    storage::saveSettings(g_settings);
+    screen_manager::refresh();
+}
+
+void onEditBacklightDim(void* /*ctx*/) {
+    char current[4];
+    snprintf(current, sizeof(current), "%d", g_settings.backlightDimSeconds);
+    components::numericKeypadOverlay(current, "Seconds", /*maxLen=*/3, /*autoAcceptLen=*/0, isValidBacklightDim,
+                                      "Must be less than the screen-off time.", onBacklightDimSaved, nullptr);
+}
+
+void onBacklightOffSaved(void* /*ctx*/, const char* text, bool accepted) {
+    if (!accepted) return;
+    g_settings.backlightOffSeconds = atoi(text);
+    storage::saveSettings(g_settings);
+    screen_manager::refresh();
+}
+
+void onEditBacklightOff(void* /*ctx*/) {
+    char current[4];
+    snprintf(current, sizeof(current), "%d", g_settings.backlightOffSeconds);
+    components::numericKeypadOverlay(current, "Seconds", /*maxLen=*/3, /*autoAcceptLen=*/0, isValidBacklightOff,
+                                      "Must be more than the dim time.", onBacklightOffSaved, nullptr);
 }
 
 void onManagePhotos(void* /*ctx*/) { screen_manager::push(PhotoTransferScreen::create); }
@@ -140,6 +189,14 @@ void SettingsScreen::build(lv_obj_t* content) {
     snprintf(intervalBuf, sizeof(intervalBuf), "%d minutes", g_settings.syncIntervalSeconds / 60);
     components::listRow(content, "Update Check Interval", intervalBuf, components::RowDot::None, onEditSyncInterval,
                          nullptr);
+
+    char dimBuf[24], offBuf[24];
+    snprintf(dimBuf, sizeof(dimBuf), "%d seconds", g_settings.backlightDimSeconds);
+    snprintf(offBuf, sizeof(offBuf), "%d seconds", g_settings.backlightOffSeconds);
+    components::listRow(content, "Dim Screen After", dimBuf, components::RowDot::None, onEditBacklightDim, nullptr);
+    components::listRow(content, "Turn Off Screen After", offBuf, components::RowDot::None, onEditBacklightOff,
+                         nullptr);
+
     components::listRow(content, "Manage Photos", nullptr, components::RowDot::None, onManagePhotos, nullptr);
 
     lv_obj_t* themeLabel = lv_label_create(content);

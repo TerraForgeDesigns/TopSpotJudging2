@@ -1388,8 +1388,120 @@ building on top of it. Newest entries at the top of each section.
       unverified beyond "compiles and traces correctly against the task spec,"
       the same ceiling every prior firmware task has had.
 
+- **F7 — Power management: backlight dim/off on idle, battery-warning logic, WiFi-off
+  verification, a real desk-test procedure. Deep sleep deliberately NOT built.**
+  Research before designing surfaced a real hardware gap that reshaped the whole
+  task — see point 1.
+  1. **No confirmed GPIO exists for touch-triggered wake — surfaced to the user
+     directly (via a clarifying question) rather than worked around, and the user
+     chose to skip deep sleep entirely for this task.** `pins.h` hardcodes
+     `PIN_TOUCH_INT = -1` (GT911 runs pure I2C polling — the working reference
+     example needs no interrupt pin) and the one candidate line (GPIO38) already
+     has an unresolved conflict with Camera CS, flagged in this file's own Open
+     section as needing a physical continuity check before it can be trusted for
+     anything. Deep sleep's `ext0`/`ext1` wake needs a real, confirmed RTC-capable
+     GPIO wired to touch — building it against an unconfirmed pin (or worse,
+     working around the gap with a wake-every-few-seconds poll loop) would
+     contradict the task's own explicit "use multiple simultaneous wake sources
+     rather than polling" instruction. The user's decision, given the options
+     directly: skip deep sleep between cars — a sleeping device unresponsive to
+     touch until a scheduled timer fire (possibly minutes away under backoff)
+     would feel broken during an active show. **True deep sleep is deferred to a
+     future "End of Day" state**, where a slow wake is genuinely fine; this task
+     builds nothing toward it beyond documenting the reason and the unblock
+     condition (the same GPIO38 continuity check already on file).
+  2. **Backlight dim/off needed zero new PWM/LEDC code.** `display::setBacklight
+     (uint8_t)` already existed (`display.h`/`.cpp`), wired through LovyanGFX's
+     `Light_PWM` class on GPIO2, just never called with anything but the hardcoded
+     `255` at boot. `power/backlight.cpp` is a small LVGL timer (polling every ~1s)
+     reading LVGL's own `lv_disp_get_inactive_time()` — already tracked
+     automatically by the touch input device `lvgl_port.cpp` registers, no
+     hand-rolled "last touch" timestamp needed — against two new
+     `storage::Settings` fields (`backlightDimSeconds`/`backlightOffSeconds`,
+     defaults 30/60, the task's own numbers). Waking is automatic: CPU, touch
+     polling, and RGB DMA all keep running through every state (only backlight LED
+     current changes), so the very next touch is already being processed normally
+     — no separate wake path exists or is needed.
+  3. **"Confirm the PWM actually reaches zero, not a dim floor" — verified against
+     LovyanGFX's actual source, not assumed.** Read
+     `Light_PWM.cpp::setBrightness()` directly: `if (brightness) { ...offset/floor
+     math... }` — the entire floor/offset calculation is skipped when brightness
+     is exactly 0, leaving `duty = 0` and an unconditional `ledcWrite(...,0)`. This
+     is a source-code confirmation, not a hardware measurement — `TESTING.md`'s new
+     F7 section still asks for a real meter/scope check, since a library reading
+     correct doesn't guarantee correct behavior on this specific board's actual
+     backlight driver circuit.
+  4. **`power/battery.h`'s contract is deliberately left completely untouched.**
+     That file's own header comment says a wrong pin guess "risks actual hardware
+     damage (over-range ADC input)" — a stronger reason than the usual "don't
+     guess a GPIO" to leave its `#error`-until-confirmed gate exactly as is.
+     Battery-warning logic (`power/battery_monitor.h`/`.cpp`) is built as a pure
+     `percent -> warning` function that NEVER includes `battery.h` — the only
+     place `#ifdef PIN_BATTERY_ADC` and `battery.h` are touched at all is one
+     conditional block in `bringup_judging.cpp`'s `setup()`, calling `battery::
+     estimatePercent()` when the pin is confirmed and passing a plain `-1`
+     ("unknown," never warns) otherwise. This is the same "wire the hook, sits
+     honestly inactive until the hardware gap closes" pattern as F4's
+     `vehicle_additions` and F6's mains-power-detect note — the moment a real
+     `PIN_BATTERY_ADC` is confirmed and `battery.cpp` gets implemented (still
+     doesn't exist — checked), this whole path activates with no further change
+     to `battery_monitor.cpp` at all.
+  5. **Battery warning wording is the task's exact copy**, at the task's exact
+     thresholds (≤20% low, ≤10% critical: "Battery low. Send your work to Home
+     Base soon.") — framing the real risk (unsynced work on a dying device), not
+     just the battery fact, per the task's own instruction. Warns only on a
+     downward transition into a new, lower tier (tracked internally) — never
+     repeats on every poll, and a climb back above a threshold (e.g. after
+     charging, once that's ever observable) resets the tracker so a future real
+     drop warns again.
+  6. **WiFi-off required no code change — already correct since F5, confirmed by
+     re-reading both call sites** (`wifi_sync.cpp` and `photo_upload.cpp`, both:
+     `WiFi.disconnect(true); WiFi.mode(WIFI_OFF);` after every attempt, hit or
+     miss). This task's real contribution here is the multimeter procedure
+     (`TESTING.md`) that lets the user get an actual measured number, per the
+     task's explicit ask — not a rebuild of something that was already right.
+  7. **No current-draw numbers are reported anywhere in this task's output** (task's
+     own final ask: "Report measured or estimated current draw in each state").
+     This environment has no board and no meter — inventing plausible-sounding mA
+     figures would be direct fabrication, the same standard this project already
+     holds `battery_pct: null` and the mains-power-detect note to. `TESTING.md`'s
+     new F7 section is built specifically so the user can produce these numbers
+     themselves; deep sleep's row in that table doesn't exist at all this task,
+     since it wasn't built (point 1).
+  8. **Flash/RAM report** (real `pio run` size output): `bringup-judging` is
+     1,249,177B flash (39.7% of `app0` — up only ~1,700B from F6's 1,247,445B,
+     confirming this task's actual code footprint is tiny) and 115,968B static RAM
+     (35.4% — essentially unchanged from F6's 115,944B). `handheld` (still not
+     calling into any of this) is 461,529B flash, 25,736B RAM — both barely above
+     F6's numbers. Small, cheap additions across the board, as expected for a task
+     that mostly reused existing plumbing (`display::setBacklight()`,
+     `lv_disp_get_inactive_time()`, `status_bar.h`'s already-built battery
+     display) rather than building new subsystems.
+  9. **Physical verification limits — same caveat as every prior firmware task,
+     total this time.** Nothing in this task can be verified AT ALL without a real
+     board, a multimeter, and a battery to actually drain — there is no
+     partial-credit verification path the way "compiles and traces correctly"
+     has been for other tasks' UI/logic work, because this task's entire
+     deliverable IS physical measurement. `TESTING.md`'s new F7 section is the
+     complete, real procedure; nothing here should be treated as validated until
+     that procedure has actually been run.
+
 ## Open
 
+- **True deep sleep between cars is deferred to a future "End of Day" state (F7) —
+  blocked on the same GPIO38/Camera-CS continuity check already on this list.**
+  `pins.h` hardcodes `PIN_TOUCH_INT = -1` (GT911 runs pure I2C polling); the one
+  candidate wake-source pin is exactly the GPIO38 line the entry below already
+  flags as needing a physical continuity check before it's trustworthy for
+  anything. F7 built backlight dim/off instead (see that entry) and intentionally
+  did not build `esp_sleep_*` code against an unconfirmed pin. Once GPIO38 (or any
+  other real, confirmed touch-INT-capable GPIO) is verified, a deep-sleep design
+  with `ext0`/`ext1` touch wake + timer wake (aligned to
+  `storage::SyncState::currentRetryIntervalSeconds`, per F5's existing backoff
+  state) can be built for real — for the "show is clearly over" / explicit
+  End-of-Day case specifically, not as a replacement for F7's between-cars
+  backlight approach, which stays regardless (RGB DMA can't idle while the
+  display is meaningfully on, deep sleep or not).
 - **No mains/USB-power-detect signal exists on this board (F6).** Same class of
   gap as the battery ADC pin immediately below — no charge-status/VBUS-sense pin
   is documented anywhere in Elecrow's materials or either reference example repo,

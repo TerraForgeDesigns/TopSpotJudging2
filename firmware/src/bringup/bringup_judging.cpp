@@ -20,16 +20,40 @@
 //      — must say it's already been judged, not let you start over.
 //   4. TESTING.md's battery-pull procedure.
 #include <Arduino.h>
+#include <lvgl.h>
 
 #include "camera/camera.h"
 #include "display/display.h"
 #include "network/wifi_sync.h"
+#include "pins.h"
+#include "power/backlight.h"
+#include "power/battery_monitor.h"
 #include "storage/sd_card.h"
 #include "storage/vehicle_db.h"
 #include "ui/lvgl_port.h"
 #include "ui/screen_manager.h"
 #include "ui/screens/home_screen.h"
 #include "ui/theme.h"
+
+// pins.h (included above) defines PIN_BATTERY_ADC only once a real ADC pin/divider has
+// been confirmed (see power/battery.h — deliberately refuses to compile
+// without it, a wrong guess risks real hardware damage). This is the
+// ONE place that conditional lives — power::battery_monitor::check()
+// itself never includes battery.h and stays buildable either way. See
+// DECISIONS.md's F7 entry.
+#ifdef PIN_BATTERY_ADC
+#include "power/battery.h"
+#endif
+
+namespace {
+void batteryPollTimerCb(lv_timer_t* /*timer*/) {
+#ifdef PIN_BATTERY_ADC
+    power::battery_monitor::check(battery::estimatePercent());
+#else
+    power::battery_monitor::check(-1);  // honestly unknown — no fabricated percentage
+#endif
+}
+}  // namespace
 
 void setup() {
     Serial.begin(115200);
@@ -49,6 +73,8 @@ void setup() {
     ui::theme::init();
     ui::screen_manager::init();
     network::sync::init();  // after screen_manager::init() — sets up LVGL timers and needs the status bar to exist
+    power::backlight::init();  // after lvglInit() — needs LVGL's display/indev already registered
+    lv_timer_create(batteryPollTimerCb, 30000, nullptr);  // 30s — cheap either way, but avoids polling an ADC every frame once one exists
     ui::screen_manager::push(ui::screens::HomeScreen::create);
 
     Serial.println("[bringup-judging] ready");
