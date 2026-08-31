@@ -689,6 +689,30 @@ building on top of it. Newest entries at the top of each section.
      page breaks," and a page with zero dependency on the app's own static assets or
      JS is the simplest way to guarantee that, independent of whether home base's own
      server is reachable when it's printed.
+- **Awards presentation mode (`/awards/present`) reuses `presentation.css` /
+  `presentation.js` almost unchanged — see the detailed "Presentation mode..."
+  entries above (a pre-Aug-2026-spec session already designed and built exactly this:
+  standalone document, curtain reveal-then-advance, judge-sheet overlay, `clamp()`
+  sizing verified at both 1280x720 and 1920x1080, native drag-and-drop reorder). That
+  session's `services/awards.py` + `awards/present.html` were deleted in the HB1
+  reconciliation along with the rest of the pre-spec awards model, but the static
+  assets were out of that reconciliation's scope and survived untouched. This task
+  only had to write a new `awards/present.html` (the markup the surviving JS/CSS
+  already expected via its `.pres-*` classes and `data-car-photo-url`/
+  `data-judge-sheet-url` attributes) and a route in `web/awards.py` assembling slide
+  data from the current nomination-based award model — no `services/awards.py`
+  needed reviving, since `award_results.py`/`awards_setup.py` already cover
+  everything a slide needs. Re-verified visually with real Playwright screenshots at
+  both resolutions, not just by inspection.
+- **The presentation walk reuses `Award.sort_order`** (the field the host already
+  drags to reorder on the Awards setup list, via the existing `/shows/{id}/awards/
+  reorder` drag-list from HB3) **as the ceremony order** — same trade-off already made
+  for `JudgingCategory.sort_order` doing double duty as tie-break priority (see the
+  tiebreak_priority entry above).
+- **Only Show Award winners are walked in the presentation, not Top Awards.** A
+  10-to-200-car Top Awards list is a ranked table (already served by `/results`), not
+  a one-at-a-time reveal ceremony — CONTEXT.md's presentation description is
+  specifically "each winning car," singular, one Show Award at a time.
 
 ## Open
 

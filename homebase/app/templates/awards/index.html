@@ -6,9 +6,19 @@
   <span class="page-header__eyebrow">{{ active_show.name }}</span>
   <h1>Awards</h1>
   <p style="color: var(--text-secondary); max-width: 60ch;">
-    Choose winners here. Adding, renaming, or reordering award slots is done from
+    Choose winners here. Adding, renaming, or reordering award slots — including the
+    order the presentation walks — is done from
     <a href="/shows/{{ active_show.id }}/edit#awards-setup">Edit Show</a>.
   </p>
+</div>
+
+<div class="row" style="margin-bottom: var(--space-6); gap: var(--space-3); align-items: center;">
+  {% if presentable_count %}
+  <a class="btn btn-primary" href="/awards/present" target="_blank" rel="noopener">Start Presentation</a>
+  {% else %}
+  {{ c.button("Start Presentation", "primary", disabled=True) }}
+  {% endif %}
+  <span class="field__hint">{{ presentable_count }} of {{ presentable_total }} award{{ "s" if presentable_total != 1 }} ready</span>
 </div>
 
 {{ c.dashboard_tabs(active_show, "awards") }}
@@ -129,7 +139,9 @@
     <div class="row" style="margin-top: var(--space-5); align-items: flex-start; gap: var(--space-4);">
       {% set photo = winner_photos.get(award.id) %}
       {% if photo %}
-      <img class="photo-thumb" src="/photo-files/{{ photo.thumbnail_path or photo.file_path }}" alt="Judge sheet for {{ award.winner_car.entry_number }}">
+      <div style="max-width: 220px; flex-shrink: 0;">
+        <img class="photo-thumb" src="/photo-files/{{ photo.thumbnail_path or photo.file_path }}" alt="Judge sheet for {{ award.winner_car.entry_number }}">
+      </div>
       {% endif %}
       <form method="post" action="/awards/announcer-name" class="field" style="max-width: 260px;">
         <input type="hidden" name="car_id" value="{{ award.winner_car_id }}">

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ active_show.name }} — Awards Presentation</title>
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/presentation.css">
+</head>
+<body>
+<div class="pres-root">
+
+  {% if slides %}
+  <div class="pres-start">
+    <div class="pres-start__wordmark">Top Spot</div>
+    <div class="pres-start__sub">Judging</div>
+    <div class="pres-start__show">{{ active_show.name }} — Awards</div>
+    <button class="pres-start__button" type="button" data-pres-start>Begin Presentation</button>
+    <div class="pres-start__hint">&rarr; or Space reveals each winner &middot; &larr; goes back &middot; J shows the judge sheet &middot; Esc exits</div>
+  </div>
+
+  <div class="pres-stage">
+    {% for slide in slides %}
+    <div class="pres-slide" data-car-photo-url="{{ slide.car_photo_url or '' }}" data-judge-sheet-url="{{ slide.judge_sheet_url or '' }}">
+      <div class="pres-slide__content">
+        <div class="pres-slide__hero">
+          {% if slide.car_photo_url %}
+          <img src="{{ slide.car_photo_url }}" alt="Car {{ slide.entry_number }}">
+          <div class="pres-slide__hero-gradient"></div>
+          {% else %}
+          <div class="pres-placeholder">
+            <div class="pres-placeholder__number">{{ slide.entry_number }}</div>
+            <div class="pres-placeholder__label">{{ [slide.year, slide.make, slide.model] | select | join(" ") or "Photo not available" }}</div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="pres-slide__panel">
+          <div class="pres-slide__award-name">{{ slide.award_name }}</div>
+          <div class="pres-slide__car-number">{{ slide.entry_number }}</div>
+          <div class="pres-slide__car-details">{{ [slide.year, slide.make, slide.model] | select | join(" ") or "—" }}</div>
+          <div class="pres-slide__announcer">
+            <strong>{{ slide.participant or "—" }}</strong>{{ " — announced by " ~ slide.announcer_name if slide.announcer_name }}
+          </div>
+          <div>
+            <span class="pres-slide__total-label">Total</span><span class="pres-slide__total">{{ slide.total if slide.total is not none else "—" }}</span>
+          </div>
+          {% if slide.category_scores %}
+          <div class="pres-scorelist">
+            {% for name, points in slide.category_scores %}
+            <div class="pres-scorelist__row">
+              <span class="pres-scorelist__name">{{ name }}</span>
+              <span class="pres-scorelist__points">{{ points }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="pres-curtain">
+        <div class="pres-curtain__eyebrow">Now Presenting</div>
+        <div class="pres-curtain__title">{{ slide.award_name }}</div>
+        <div class="pres-curtain__hint">Press &rarr; or Space to reveal the winner</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="pres-sheet-overlay">
+    <img src="" alt="Judge sheet">
+    <div class="pres-sheet-overlay__hint">Press J to hide</div>
+  </div>
+
+  <div class="pres-controls">
+    <button class="pres-nav-btn" type="button" data-pres-prev aria-label="Previous">&#8249;</button>
+    <div class="pres-progress">
+      <span data-pres-progress-text></span>
+      <div class="pres-progress__dots">
+        {% for slide in slides %}<div class="pres-progress__dot"></div>{% endfor %}
+      </div>
+    </div>
+    <button class="pres-nav-btn" type="button" data-pres-next aria-label="Next">&#8250;</button>
+  </div>
+  {% else %}
+  <div class="pres-empty">
+    <div class="pres-empty__title">No winners to present yet</div>
+    <div class="pres-empty__body">Choose a winner for at least one award — or use the suggested winner — before starting the presentation.</div>
+    <a class="pres-empty__link" href="/awards">Go to Awards</a>
+  </div>
+  {% endif %}
+
+</div>
+<script src="/static/js/presentation.js"></script>
+</body>
+</html>
