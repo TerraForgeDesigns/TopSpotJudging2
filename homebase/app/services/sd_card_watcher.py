@@ -15,6 +15,7 @@ list_removable_drives() and branching in list_removable_drives() below —
 the polling loop and everything that happens after a card is detected
 stays untouched.
 """
+import logging
 import sys
 import threading
 import time
@@ -25,6 +26,8 @@ from app.models import TransferMethod
 from app.services import photo_import_status as status_service
 from app.services.photo_ingest import find_candidate_photo_files, ingest_photo_file
 from app.services.shows import get_active_show
+
+logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 2.0
 
@@ -59,8 +62,12 @@ def scan_and_ingest_drive(drive_root: Path, source_label: str) -> None:
             result = ingest_photo_file(db, source_path, show.id, TransferMethod.SD_CARD)
             status_service.record_result(result.status)
         status_service.finish_scan()
-    except Exception as exc:  # noqa: BLE001 - a scan failing must be visible, never silent
-        status_service.fail_scan(f"Import failed: {exc}")
+    except Exception:  # noqa: BLE001 - a scan failing must be visible, never silent
+        logger.exception("Photo import failed for %s", source_label)
+        status_service.fail_scan(
+            "Home Base could not finish importing these photos. "
+            "Try removing and reinserting the memory card. If it keeps happening, restart Home Base."
+        )
     finally:
         db.close()
 

@@ -50,7 +50,7 @@ def can_deactivate_category(db: Session, category: JudgingCategory) -> str | Non
         subject = "1 car has" if judged_count == 1 else f"{judged_count} cars have"
         return (
             f"{subject} already been judged on {category.name}. Turning it off now would "
-            "drop those scores from category totals and rankings."
+            "drop those scores from category totals and rankings, so this can't be changed for this show."
         )
     return None
 
@@ -74,6 +74,6 @@ def can_activate_category(db: Session, category: JudgingCategory) -> str | None:
     if has_judged_cars:
         return (
             f"Cars have already been judged without {category.name}. Adding it now would "
-            "leave those cars unscored in that category."
+            "leave those cars unscored in that category, so this can't be changed for this show."
         )
     return None

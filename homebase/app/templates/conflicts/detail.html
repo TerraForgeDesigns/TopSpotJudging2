@@ -10,6 +10,12 @@
   </p>
 </div>
 
+{% if page_error %}
+<div class="card" style="border-color: var(--red-500); margin-bottom: var(--space-6); max-width: 640px;">
+  <p class="card__body" style="color: var(--text-primary);">{{ page_error }}</p>
+</div>
+{% endif %}
+
 <div class="table-wrap table-wrap--scroll" style="margin-bottom: var(--space-6);">
   <table class="table">
     <thead>

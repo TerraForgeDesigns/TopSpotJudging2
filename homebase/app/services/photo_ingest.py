@@ -18,6 +18,7 @@ Hard rules (CONTEXT.md — photos are irreplaceable after the show ends):
   - A thumbnail failure never fails the ingest — the original copy is
     what matters; thumbnail_path is just left null.
 """
+import logging
 import re
 import shutil
 import uuid
@@ -30,6 +31,8 @@ from sqlalchemy.orm import Session
 
 from app.config import PHOTOS_DIR
 from app.models import Car, Photo, PhotoStatus, PhotoType, TransferMethod
+
+logger = logging.getLogger(__name__)
 
 _FILENAME_RE = re.compile(r"^(?P<reg>.+)_(?P<kind>car|sheet)$", re.IGNORECASE)
 _ALLOWED_EXTENSIONS = {".jpg", ".jpeg"}
@@ -110,7 +113,10 @@ def ingest_photo_file(
     if parsed is None:
         return IngestResult(
             status="skipped",
-            message=f"'{source_filename}' doesn't match the {{entry_number}}_car/_sheet.jpg pattern.",
+            message=(
+                f"'{source_filename}' doesn't look like a car or judge sheet photo — its file name should "
+                "start with the entry number, like '042_car.jpg' or '042_sheet.jpg'."
+            ),
             source_filename=source_filename,
         )
 
@@ -120,9 +126,10 @@ def ingest_photo_file(
     try:
         source_size = source_path.stat().st_size
     except OSError as exc:
+        logger.warning("Could not read %s: %s", source_filename, exc)
         return IngestResult(
             status="error",
-            message=f"Couldn't read '{source_filename}': {exc}",
+            message=f"'{source_filename}' could not be read from the memory card. Try scanning again.",
             entry_number=entry_number,
             source_filename=source_filename,
         )
@@ -167,9 +174,10 @@ def ingest_photo_file(
     try:
         shutil.copy2(source_path, dest_path)
     except OSError as exc:
+        logger.warning("Could not copy %s to %s: %s", source_filename, dest_path, exc)
         return IngestResult(
             status="error",
-            message=f"Couldn't copy '{source_filename}': {exc}",
+            message=f"'{source_filename}' could not be saved to Home Base. Check that there's free disk space and try again.",
             entry_number=entry_number,
             source_filename=source_filename,
         )

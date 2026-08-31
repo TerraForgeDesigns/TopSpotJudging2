@@ -93,7 +93,7 @@ def test_can_activate_blocked_once_any_car_is_judged(db_session, show_with_categ
     assert "Paint" in reason
     assert reason == (
         "Cars have already been judged without Paint. Adding it now would "
-        "leave those cars unscored in that category."
+        "leave those cars unscored in that category, so this can't be changed for this show."
     )
 
 

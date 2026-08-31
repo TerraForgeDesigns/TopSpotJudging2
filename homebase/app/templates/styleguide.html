@@ -32,9 +32,9 @@
     <div class="swatch"><div class="swatch__color" style="background: var(--gold-400);"></div>
       <div class="swatch__label"><strong>--gold-400</strong>#FFB84D · gold hover</div></div>
     <div class="swatch"><div class="swatch__color" style="background: var(--green-500);"></div>
-      <div class="swatch__label"><strong>--green-500</strong>#12B76A · judged / synced</div></div>
+      <div class="swatch__label"><strong>--green-500</strong>#12B76A · judged / up to date</div></div>
     <div class="swatch"><div class="swatch__color" style="background: var(--blue-500);"></div>
-      <div class="swatch__label"><strong>--blue-500</strong>#2E90FA · pending / info</div></div>
+      <div class="swatch__label"><strong>--blue-500</strong>#2E90FA · updating / info</div></div>
     <div class="swatch"><div class="swatch__color" style="background: var(--red-500);"></div>
       <div class="swatch__label"><strong>--red-500</strong>#F04438 · conflict / error</div></div>
   </div>
@@ -83,21 +83,26 @@
 <section class="section">
   <h2 class="section__title">Inputs</h2>
   <div class="row" style="align-items: flex-start;">
-    {{ c.field("Registration number", "reg_default", placeholder="e.g. 0142", hint="Printed on the paper form.") }}
-    {{ c.field("Owner name", "reg_error", placeholder="Required", error="This field is required.") }}
-    {{ c.field("Announcer name", "reg_disabled", placeholder="Not editable", disabled=True) }}
+    {{ c.field("Participant", "field_default", placeholder="e.g. Jamie Diaz") }}
+    {{ c.field("Make", "field_error", placeholder="Required", error="Enter a make before saving.") }}
     <div class="field">
-      <label class="field__label" for="class_select">Car class</label>
-      <select class="select" id="class_select" name="class_select">
-        <option>1970s Muscle</option>
-        <option>Trucks</option>
-        <option>Stock</option>
+      <label class="field__label">Entry Number</label>
+      <input class="input" type="text" value="042" disabled>
+      <span class="field__hint">Assigned automatically and can't be changed.</span>
+    </div>
+    <div class="field">
+      <label class="field__label" for="vehicle_type_select">Vehicle Type</label>
+      <select class="select" id="vehicle_type_select" name="vehicle_type_select">
+        <option>Muscle Car</option>
+        <option>Truck</option>
+        <option>Classic</option>
+        <option>Other</option>
       </select>
     </div>
   </div>
   <div class="field" style="margin-top: var(--space-4);">
-    <label class="field__label" for="notes">Judge notes</label>
-    <textarea class="textarea" id="notes" name="notes" placeholder="Optional notes for this car..."></textarea>
+    <label class="field__label" for="notes">Notes</label>
+    <textarea class="textarea" id="notes" name="notes" placeholder="Optional"></textarea>
   </div>
 </section>
 
@@ -106,7 +111,7 @@
   <h2 class="section__title">Status pills</h2>
   <div class="row">
     {{ c.pill("Judged", "judged") }}
-    {{ c.pill("Pending Sync", "pending") }}
+    {{ c.pill("Updating", "pending") }}
     {{ c.pill("Conflict", "conflict") }}
     {{ c.pill("Unjudged", "unjudged") }}
   </div>
@@ -118,17 +123,17 @@
   <div class="card-grid">
     <div class="card">
       <div class="card__header">
-        <h3 class="card__title">Car #0142</h3>
+        <h3 class="card__title">Car 042</h3>
         {{ c.pill("Judged", "judged") }}
       </div>
       <div class="card__body">1967 Chevrolet Camaro — R. Alvarez</div>
     </div>
     <div class="card">
       <div class="card__header">
-        <h3 class="card__title">Car #0231</h3>
+        <h3 class="card__title">Car 231</h3>
         {{ c.pill("Conflict", "conflict") }}
       </div>
-      <div class="card__body">Two accepted submissions — needs host resolution.</div>
+      <div class="card__body">This car was judged twice. Choose which scores to keep.</div>
     </div>
     <div class="card empty-state">
       <div class="empty-state__icon">—</div>
@@ -145,39 +150,39 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Reg #</th>
+          <th>Entry #</th>
           <th>Car</th>
-          <th>Class</th>
+          <th>Vehicle Type</th>
           <th>Status</th>
-          <th class="col-num">Total score</th>
+          <th class="col-num">Total</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">0142</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">042</td>
           <td>1967 Chevrolet Camaro</td>
-          <td>1970s Muscle</td>
+          <td>Muscle Car</td>
           <td>{{ c.pill("Judged", "judged") }}</td>
           <td class="col-num">94</td>
         </tr>
         <tr>
-          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">0231</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">231</td>
           <td>1955 Ford F-100</td>
-          <td>Trucks</td>
+          <td>Truck</td>
           <td>{{ c.pill("Conflict", "conflict") }}</td>
           <td class="col-num">—</td>
         </tr>
         <tr>
-          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">0308</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">308</td>
           <td>1965 Ford Mustang</td>
-          <td>Stock</td>
-          <td>{{ c.pill("Pending Sync", "pending") }}</td>
+          <td>Classic</td>
+          <td>{{ c.pill("Updating", "pending") }}</td>
           <td class="col-num">88</td>
         </tr>
         <tr>
-          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">0412</td>
+          <td class="mono-label" style="text-transform: none; letter-spacing: 0;">412</td>
           <td>1971 Plymouth Barracuda</td>
-          <td>1970s Muscle</td>
+          <td>Muscle Car</td>
           <td>{{ c.pill("Unjudged", "unjudged") }}</td>
           <td class="col-num">—</td>
         </tr>
@@ -191,10 +196,10 @@
   <h2 class="section__title">Empty states</h2>
   <div class="card empty-state" style="max-width: 480px;">
     <div class="empty-state__icon">—</div>
-    <h3 class="empty-state__title">No cars registered</h3>
-    <p>Import a roster or add cars manually to begin judging.</p>
+    <h3 class="empty-state__title">No cars yet</h3>
+    <p>This show doesn't have any entries yet.</p>
     <div class="row" style="justify-content: center; margin-top: var(--space-5);">
-      {{ c.button("Import roster", "primary") }}
+      {{ c.button("Add Cars", "primary") }}
     </div>
   </div>
 </section>
@@ -205,9 +210,9 @@
   <button type="button" class="btn btn-destructive" data-modal-open="demo-modal">Open confirm dialog</button>
   <div class="modal-overlay" id="demo-modal" hidden>
     <div class="modal">
-      <h3 class="modal__title">Discard this submission?</h3>
-      <p class="modal__body">Car #0231 already has an accepted score. Discarding this
-        duplicate cannot be undone.</p>
+      <h3 class="modal__title">Discard this set of scores?</h3>
+      <p class="modal__body">Car 231 already has an accepted set of scores. Discarding this
+        one instead cannot be undone.</p>
       <div class="modal__actions">
         <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
         <button type="button" class="btn btn-destructive btn-destructive--filled" data-modal-close>Discard</button>
@@ -222,22 +227,22 @@
   <div class="toast-stack">
     <div class="toast toast--success">
       <div>
-        <div class="toast__title">Sync complete</div>
-        <div class="toast__body">Handheld 2 synced 14 submissions.</div>
+        <div class="toast__title">Handheld 2 is up to date</div>
+        <div class="toast__body">14 new scores added.</div>
       </div>
       <button type="button" class="btn-secondary" style="margin-left:auto; background:none; border:none; color: var(--text-secondary); cursor:pointer;" data-toast-dismiss>&times;</button>
     </div>
     <div class="toast toast--info">
       <div>
         <div class="toast__title">Waiting for handhelds</div>
-        <div class="toast__body">2 of 4 handhelds have not synced in over 15 minutes.</div>
+        <div class="toast__body">2 of 4 handhelds have not connected in over 15 minutes.</div>
       </div>
       <button type="button" style="margin-left:auto; background:none; border:none; color: var(--text-secondary); cursor:pointer;" data-toast-dismiss>&times;</button>
     </div>
     <div class="toast toast--error">
       <div>
         <div class="toast__title">Conflict flagged</div>
-        <div class="toast__body">Car #0231 has two accepted submissions.</div>
+        <div class="toast__body">Car 231 was judged twice.</div>
       </div>
       <button type="button" style="margin-left:auto; background:none; border:none; color: var(--text-secondary); cursor:pointer;" data-toast-dismiss>&times;</button>
     </div>

@@ -41,11 +41,12 @@ def conflict_detail(car_id: int, request: Request, db: Session = Depends(get_db)
     context = base_context(request, db, "/conflicts")
     context["view"] = build_conflict_view(car)
     context["correction_error"] = None
+    context["page_error"] = None
     return templates.TemplateResponse(request, "conflicts/detail.html", context)
 
 
 @router.post("/conflicts/{car_id}/accept")
-def accept(car_id: int, submission_id: int = Form(...), db: Session = Depends(get_db)):
+def accept(car_id: int, request: Request, submission_id: int = Form(...), db: Session = Depends(get_db)):
     show = require_active_show(db)
     if show is None:
         return RedirectResponse("/shows", status_code=303)
@@ -54,7 +55,17 @@ def accept(car_id: int, submission_id: int = Form(...), db: Session = Depends(ge
     if car is None or car.show_id != show.id:
         return RedirectResponse("/conflicts", status_code=303)
 
-    accept_submission(db, show, car, submission_id)
+    try:
+        accept_submission(db, show, car, submission_id)
+    except ValueError:
+        context = base_context(request, db, "/conflicts")
+        context["view"] = build_conflict_view(car)
+        context["correction_error"] = None
+        context["page_error"] = (
+            "This conflict may have already been resolved by someone else. "
+            "Check the scores below and choose again if needed."
+        )
+        return templates.TemplateResponse(request, "conflicts/detail.html", context)
     return RedirectResponse("/conflicts", status_code=303)
 
 
@@ -88,6 +99,7 @@ async def correct(car_id: int, request: Request, note: str = Form(""), db: Sessi
         context["view"] = view
         context["correction_error"] = "Fix the highlighted scores before saving the correction."
         context["score_errors"] = errors
+        context["page_error"] = None
         return templates.TemplateResponse(request, "conflicts/detail.html", context)
 
     create_corrected_submission(db, show, car, scores, note)

@@ -49,12 +49,7 @@ def photos_scan(db: Session = Depends(get_db)):
     return RedirectResponse("/photos", status_code=303)
 
 
-@router.get("/photos/unmatched")
-def photos_unmatched(request: Request, db: Session = Depends(get_db)):
-    show = require_active_show(db)
-    if show is None:
-        return RedirectResponse("/shows", status_code=303)
-
+def _unmatched_context(request: Request, db: Session, show, error: str | None = None) -> dict:
     photos = list_unmatched_photos(db, show.id)
     groups: dict[str, list] = defaultdict(list)
     for photo in photos:
@@ -69,11 +64,29 @@ def photos_unmatched(request: Request, db: Session = Depends(get_db)):
     context = base_context(request, db, "/photos")
     context["groups"] = grouped
     context["cars"] = [row.car for row in list_cars(db, show.id)]
-    return templates.TemplateResponse(request, "photos/unmatched.html", context)
+    context["resolve_error"] = error
+    return context
+
+
+@router.get("/photos/unmatched")
+def photos_unmatched(request: Request, db: Session = Depends(get_db)):
+    show = require_active_show(db)
+    if show is None:
+        return RedirectResponse("/shows", status_code=303)
+
+    return templates.TemplateResponse(request, "photos/unmatched.html", _unmatched_context(request, db, show))
 
 
 @router.post("/photos/resolve")
-def resolve_photos(photo_ids: list[int] = Form(...), car_id: int = Form(...), db: Session = Depends(get_db)):
-    for photo_id in photo_ids:
-        resolve_unmatched_photo(db, photo_id, car_id)
+def resolve_photos(request: Request, photo_ids: list[int] = Form(...), car_id: int = Form(...), db: Session = Depends(get_db)):
+    show = require_active_show(db)
+    if show is None:
+        return RedirectResponse("/shows", status_code=303)
+
+    try:
+        for photo_id in photo_ids:
+            resolve_unmatched_photo(db, photo_id, car_id)
+    except ValueError:
+        error = "That photo or car is no longer available. Refresh the page and try again."
+        return templates.TemplateResponse(request, "photos/unmatched.html", _unmatched_context(request, db, show, error))
     return RedirectResponse("/photos/unmatched", status_code=303)

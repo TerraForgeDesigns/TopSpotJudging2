@@ -74,13 +74,19 @@ def update_show(
     notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    shows_service.update_show(db, show_id, name=name, event_date=event_date, location=location, notes=notes)
+    try:
+        shows_service.update_show(db, show_id, name=name, event_date=event_date, location=location, notes=notes)
+    except ValueError:
+        pass  # The show no longer exists — nothing left to save.
     return RedirectResponse("/shows", status_code=303)
 
 
 @router.post("/shows/{show_id}/activate")
 def activate_show(show_id: int, db: Session = Depends(get_db)):
-    shows_service.set_active_show(db, show_id)
+    try:
+        shows_service.set_active_show(db, show_id)
+    except ValueError:
+        pass  # The show no longer exists — nothing left to switch to.
     return RedirectResponse("/shows", status_code=303)
 
 

@@ -43,6 +43,53 @@ Show, Cars, Entry Number, Participant, Judging, Judging Category, Score, Max Sco
 Awards, Choose Winner, Handheld, Photos, Connected, Not Connected, Updating,
 Up to Date, Add Cars, Edit Show, Year, Make, Model, Other, Search, Done, Back, Cancel.
 
+## Recurring state phrasing — identical on both devices
+
+Home Base and the handheld both describe the same handful of states constantly — a
+handheld's connection, a car's judging status, whether something saved. The words below
+are the only ones either device may use for these states. Neither platform may invent a
+synonym for one of these — a judge who learns what "Updating" means on the handheld
+must see the identical word for the identical state on Home Base's screen, and back.
+Sourced from Home Base's UI as already built (`handhelds.html`, `partials/
+dashboard_live.html`, `cars/list.html`) — this is the reference the handheld's own
+judging-flow screens must match when they're built; nothing in the firmware
+overrides it.
+
+**A handheld's connection, as Home Base shows it** (a colored pill; thresholds from
+`services/dashboard.py`):
+
+| Word | Color | Meaning |
+|---|---|---|
+| Up to Date | green | Heard from this handheld in the last 3 minutes. |
+| Updating | blue | Last heard from 3–15 minutes ago — normal while a judge is out of Wi-Fi range, not an error. |
+| Not Connected | red | Not heard from in over 15 minutes, or never. |
+
+**Home Base's connection, as the handheld shows it** — the same three words, describing
+the same link from the other side. When a full sentence is needed instead of a status
+word, the established phrasing is already in the Never/Always table above: "Home Base
+Not Connected," or spelled out per the error-message standard, "Home Base could not be
+reached. Check that Home Base is running and this device is connected to the show
+Wi-Fi."
+
+**A car's judging status:**
+
+| Word | Color | Meaning |
+|---|---|---|
+| Judged | green | Has one accepted set of scores. |
+| Unjudged | gray | No accepted score yet — never shown as "0" or left blank; see CONTEXT.md's scoring section. |
+| Flagged Conflict | red | Two handhelds both produced a score for this car. The host chooses which to keep. |
+
+**Saving:** "Save" is the action, "Saved" is the confirmation once it's done — never
+"Persist," "Persisted," "Synced," or "Submitted." A handheld that writes a score to its
+own storage before Home Base has ever seen it should say "Saved" the moment that local
+write completes, not only once Home Base has received it — the judge needs to know the
+entry survived even while still out of Wi-Fi range.
+
+**Photo coverage is Home Base only.** Home Base additionally shows "Both," "1 of 2," and
+"Missing" for a car's photo coverage (Cars section) — there's no handheld equivalent,
+since a handheld has no way to know what the other device's camera captured. Don't
+invent a matching handheld phrase for this one.
+
 ## Diagnostic-only vocabulary
 
 The following must never appear on a handheld outside a hidden diagnostic screen: API,

@@ -12,6 +12,12 @@
   </p>
 </div>
 
+{% if resolve_error %}
+<div class="card" style="border-color: var(--red-500); margin-bottom: var(--space-6); max-width: 640px;">
+  <p class="card__body" style="color: var(--text-primary);">{{ resolve_error }}</p>
+</div>
+{% endif %}
+
 {% if groups %}
 <div class="card-grid">
   {% for group in groups %}
