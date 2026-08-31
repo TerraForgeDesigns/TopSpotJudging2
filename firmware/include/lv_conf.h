@@ -226,7 +226,11 @@ extern const lv_font_t ui_font_plex_400_16;  // must match fonts/ui_font_plex_40
 #define LV_USE_FS_FATFS 0
 #define LV_USE_PNG 0
 #define LV_USE_BMP 0
-#define LV_USE_SJPG 0
+// PHOTOS screen preview (F3) needs this — displays the JPEG just written
+// by camera::captureToFile() straight from a PSRAM buffer (no LVGL
+// filesystem driver needed — see ui/screens/photos_screen.cpp). Flash
+// cost is the one real feature-flag change since F2; see DECISIONS.md.
+#define LV_USE_SJPG 1
 #define LV_USE_GIF 0
 #define LV_USE_QRCODE 0
 #define LV_USE_FREETYPE 0

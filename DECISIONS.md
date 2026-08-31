@@ -838,8 +838,112 @@ building on top of it. Newest entries at the top of each section.
         nothing calls it — confirms the component library is fully tree-shakeable once
         real screens start selectively using pieces of it, not an all-or-nothing cost.
 
+- **F3 — The real judging flow: local storage foundation (settings, show cache, sync
+  state, drafts, the finished-car queue) plus the seven screens from Home through
+  Review, wired together by a single in-progress-car session.** See each numbered
+  point for one piece of it; see firmware/TESTING.md (new) for the battery-pull
+  procedure this task's crash-safety design is built to pass.
+  1. **Two crash-safe write primitives now exist, at two different layers.**
+     `storage::writeFileAtomic()` (`sd_card.cpp`) is the low-level one: write to
+     `path.tmp`, flush, close, reopen and verify the size matches, delete any existing
+     `path`, rename the temp file in. It has one accepted gap — a crash in the narrow
+     window between deleting the old `path` and renaming the new one in loses the OLD
+     value — deliberately accepted only for files that are cheap to reconstruct
+     (settings, the show cache, sync state). `storage/pending_queue.h`'s finished-car
+     queue sidesteps that gap entirely at the design level: every finished car gets its
+     own uniquely-named file (`{entry_number}_{closed_at_uptime_ms}.json`), written
+     exactly once and never overwritten, so the "delete-then-rename" gap never applies
+     to it at all — see that file's own header comment for the full reasoning.
+  2. **Drafts (`storage/drafts.h`) are "a QueuedCar that isn't finished yet," reusing
+     `pending_queue.h`'s `QueuedScore` struct and count constants rather than a parallel
+     definition.** One file per entry number at `/drafts/{entry}.json`, saved via the
+     same `writeFileAtomic()` path, after every screen transition in the judging flow —
+     see point 4 for why autosave-everywhere was chosen over an explicit save action.
+  3. **`storage::checkQueueIntegrity()` classifies every file under `/queue/` into
+     valid / orphaned-`.tmp` / unreadable, and only ever acts on the `.tmp` bucket
+     (deletes it).** An `unreadable` file (parses as neither a valid queued car nor a
+     recognizable `.tmp`) is left untouched and reported — this function is a diagnostic
+     that makes the atomic-write design's own claim ("a `.tmp` is never a lost car")
+     verifiable rather than assumed, not a repair tool. `bringup-storage` exercises it
+     every run; TESTING.md's battery-pull procedure is what actually interrupts a write
+     to try to produce an `unreadable` file (it shouldn't be possible to, by design).
+  4. **Resume, not discard-or-keep.** A judge who starts a car and walks away before
+     Review does NOT get a "discard or keep?" prompt when they come back — that prompt
+     is itself a way to lose work (a tired judge taps the wrong button). Instead:
+     `judging::save()` (`ui/judging_session.cpp`) writes the draft after every
+     meaningful change and on leaving every screen in the flow, recording
+     `furthestStep`; `ENTER CAR` (`enter_car_screen.cpp`) checks `storage::hasDraft()`
+     for whatever entry number gets typed and, if one exists, resumes straight at
+     `furthestStep` via `enterJudgingFlowAt()` — never restarting at Vehicle Details.
+     The only explicit "throw this away" path is `judging::discard()`, wired to a
+     judge's deliberate action, distinct from just navigating Home.
+  5. **A car already finished on THIS device refuses a second attempt, at ENTER CAR
+     time, before any screen is even pushed.** `storage::isEntryQueued()` scans
+     `/queue/` filenames for `{entry}_*` and, if a draft doesn't already exist for that
+     number (i.e. this isn't a resume), blocks with a toast rather than letting the
+     judge re-judge and create an on-device duplicate. Cross-device duplicates (two
+     different handhelds judging the same car) are explicitly NOT handled here — that's
+     Home Base's sync-time conflict resolution, per PROTOCOL.md; this is only the
+     cheap, local, same-device case.
+  6. **Review's Confirm button is disabled outright (not just refused on tap) until
+     both `DraftCar::carPhotoSaved` and `sheetPhotoSaved` are true**, with a plain
+     on-screen explanation ("Both photos are required...") rather than a silent
+     disabled state — matches CONTEXT.md's photo-required rule and LANGUAGE.md's
+     "never a silent dead end" standard. `judging::finish()` itself is the second,
+     independent gate: it only deletes the draft and enqueues the car if
+     `storage::enqueueCar()` returns a verified-complete write; a failed enqueue
+     leaves the draft (and the judge's progress) untouched, and Review shows an error
+     toast instead of navigating away.
+  7. **`LV_USE_SJPG` flipped on in `lv_conf.h` (was `0`) — the one LVGL feature-flag
+     change since F2.** Needed so the Photos screen's preview can decode the JPEG
+     `camera::captureToFile()` just wrote straight from a PSRAM buffer, with no LVGL
+     filesystem driver involved. Review's own thumbnails take a different, cheaper path
+     — `LV_IMG_CF_RAW` fed directly from a `heap_caps_malloc`'d PSRAM buffer — so SJPG's
+     flash cost is paid once, by Photos, not twice.
+  8. **`camera::CAPTURE_MODE_PHOTO` (1280x720, `CAM_IMAGE_MODE_HD`) is a new, distinct
+     mode from the bring-up test's `CAM_IMAGE_MODE_QVGA` (320x240)** — QVGA was chosen
+     there only for a fast wiring-check round trip, never meant to represent real photo
+     quality. NOT verified against real hardware at 720p specifically (capture time,
+     file size, SD write duration) — flagged as an open item below, not assumed fine.
+  9. **Bug fixed during this session's own build verification, not part of the original
+     task scope: `sd_card.cpp`'s `ensureDir()` only ever called `SD.mkdir()` on the full
+     path, while its own header comment promised walking and creating each `/`-segment
+     in turn** (true nested creation, since this SD library's `mkdir()` doesn't nest on
+     its own). Every CALLER today only ever passes a single-level path (`/drafts`,
+     `/queue`), so this was latent, not currently triggered — but the comment was a
+     false promise to the next caller that passes something like `/photos/unmatched`.
+     Fixed to actually walk segments; re-verified `bringup-storage` and `bringup-judging`
+     both still build and link clean after the fix.
+  10. **Flash/RAM report** (real `pio run` size output, after the `ensureDir` fix above):
+      - `bringup-storage` (settings/show-cache/sync-state/drafts/queue smoke test, no
+        UI): 457,549 B flash (14.5% of the app partition), 21,280 B static RAM (6.5%).
+      - `bringup-judging` (the full F3 flow, LVGL + all screens + camera + storage):
+        735,245 B flash (23.4% of the app partition), 73,352 B static RAM (22.4%) — for
+        comparison, F2's `bringup-ui` (LVGL foundation alone, no judging screens) was
+        696,253 B flash, so F3's seven screens plus storage layer cost roughly 39,000 B
+        of flash on top of the UI foundation.
+      - `handheld` (integrated target — `main.cpp` still doesn't call into `ui::` or
+        this task's storage modules): 440,669 B flash, 21,776 B static RAM — barely
+        above F2's number, confirming F3's additions are still fully tree-shaken out
+        until `main.cpp` actually starts calling into them.
+  11. **Physical verification limits — same caveat as every prior firmware task.**
+      Nothing here ran on real hardware; there is no board attached to this
+      environment. What WAS verified: all seven PlatformIO environments (`bringup-ui`,
+      `bringup-display`, `bringup-sd`, `bringup-camera`, `bringup-storage`,
+      `bringup-judging`, `handheld`) build and link clean, no regressions. New
+      `firmware/TESTING.md` documents exactly what a human must physically check —
+      including the battery-pull procedure — before this task's crash-safety claims
+      (points 1-6 above) can be trusted rather than just argued for.
+
 ## Open
 
+- **`camera::CAPTURE_MODE_PHOTO` (1280x720) is unverified against real hardware.** F3
+  picked `CAM_IMAGE_MODE_HD` for the judging flow's two required photos, but the only
+  resolution ever exercised on real hardware was the bring-up test's QVGA (320x240) —
+  see F3's point 8. Once a board is available: confirm capture time, resulting JPEG
+  file size, and SD write duration are all acceptable for a judge moving quickly
+  through 100-400 cars; drop to a lower `CAM_IMAGE_MODE_*` if 720p turns out too slow
+  or too large.
 - **Confirm Car Class removal.** DECISIONS.md above treats Car Class as superseded by
   the new nomination-based Show Awards, but the Aug 2026 spec update never said so
   explicitly — this is this session's inference. Confirm before deleting `CarClass`,

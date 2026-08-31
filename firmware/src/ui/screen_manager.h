@@ -57,6 +57,12 @@ void pop();
 // stack from skipped intermediate pops.
 void popToRoot();
 
+// Tears down and rebuilds the CURRENT screen from its own factory,
+// staying at the same stack depth — for a screen that changed something
+// it displays (e.g. Settings, after editing a field) and wants an easy
+// full re-render rather than hand-updating individual widgets.
+void refresh();
+
 int depth();
 
 }  // namespace screen_manager

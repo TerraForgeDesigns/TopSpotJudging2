@@ -143,6 +143,11 @@ void popToRoot() {
     buildCurrent();
 }
 
+void refresh() {
+    destroyCurrent();
+    buildCurrent();
+}
+
 int depth() { return g_depth; }
 
 }  // namespace ui::screen_manager

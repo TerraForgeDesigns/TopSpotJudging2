@@ -1,0 +1,73 @@
+// Local cache of everything Home Base has told this handheld about the
+// show — the pieces judging actually needs offline: active categories
+// (name + order), the current score range, judge-chosen awards, whether
+// Overall Impression is on, and per-entry details Home Base already
+// holds. Written from a sync response (not built yet — see
+// network/wifi_sync.h); read by every judging screen. All of this is
+// exactly what CONTEXT.md/PROTOCOL.md call "configuration" and "cars" —
+// never shown to a judge by those names, per LANGUAGE.md.
+#pragma once
+
+#include <cstdint>
+
+namespace storage {
+
+struct Category {
+    int id = 0;
+    char name[40] = "";
+    int sortOrder = 0;
+};
+
+struct JudgeChosenAward {
+    int id = 0;
+    char name[64] = "";
+};
+
+// See CONTEXT.md's "Judging categories & scoring range" — the set is
+// fixed at five, so a fixed-size array here is a real invariant, not an
+// arbitrary cap.
+constexpr int MAX_CATEGORIES = 5;
+// CONTEXT.md's Show Awards start at 7 built-ins but the organiser can add
+// more — generous headroom, not a hard show-design limit enforced here.
+constexpr int MAX_AWARDS = 24;
+
+struct ShowInfo {
+    char showName[128] = "";
+    int scoreRangeMax = 5;
+    int maxScore = 0;
+    bool overallImpressionEnabled = false;
+    Category categories[MAX_CATEGORIES];
+    int categoryCount = 0;
+    JudgeChosenAward awards[MAX_AWARDS];
+    int awardCount = 0;
+};
+
+bool loadShowInfo(ShowInfo* out);
+bool saveShowInfo(const ShowInfo& info);  // atomic write to /show.json
+
+// One entry's cached details — see CONTEXT.md: "If Home Base already
+// holds details for that entry number... the handheld pre-fills
+// Participant, Year, Make, and Model." Every string field empty means
+// "Home Base has this entry number but no details for it yet," which is
+// different from the entry not existing in the cache at all (see
+// findEntry() below).
+struct Entry {
+    char entryNumber[8] = "";
+    char participant[80] = "";
+    char year[8] = "";
+    char make[48] = "";
+    char model[48] = "";
+    char vehicleType[32] = "";
+};
+
+// Looks up `entryNumber` in the local cache (/entries.json). Returns
+// false if this handheld has never heard of that entry number — the
+// ENTER CAR screen's "not in the list yet" case, see CONTEXT.md — never
+// a hard error; the judge can still continue.
+bool findEntry(const char* entryNumber, Entry* out);
+
+// Replaces the entire local entry cache — called after a sync pulls a
+// fresh roster (not built yet). Atomic write to /entries.json.
+bool saveEntries(const Entry* entries, int count);
+
+}  // namespace storage

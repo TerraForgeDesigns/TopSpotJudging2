@@ -37,8 +37,35 @@ SdInfo getInfo();
 
 // Writes `data` (length `len`) to `path` (e.g. "/test.txt"), overwriting
 // if it exists. Returns false on any failure (not mounted, write error,
-// short write).
+// short write). NOT crash-safe on its own — a battery pull mid-write
+// leaves `path` truncated/corrupt. Use writeFileAtomic() for anything
+// that must survive that (queue entries, show cache, settings, sync
+// state) — see CONTEXT.md's resilience principle.
 bool writeFile(const char* path, const uint8_t* data, size_t len);
+
+// Crash-safe write: writes to `path` + ".tmp", flushes, closes, verifies
+// the temp file's size matches `len` by reopening and checking, deletes
+// any existing file at `path`, then renames the temp file into place.
+// `path` is only ever observed in its old (complete) state or its new
+// (complete) state — a battery pull at any point during this leaves
+// `path` itself untouched (worst case: an orphaned .tmp file, which the
+// caller's own boot-time scan can ignore or clean up; it was never
+// renamed, so it was never "the real file").
+//
+// The one narrow gap: if `path` already existed, there's a brief window
+// between deleting it and renaming the temp file in where NEITHER exists
+// — a crash in exactly that window loses the OLD value. This is
+// deliberately accepted only for files that are cheap to reconstruct
+// (settings, the show cache, sync state — all re-enterable or
+// re-fetchable) — see storage/pending_queue.h, which sidesteps this
+// entirely by never overwriting an existing file at all (each finished
+// car gets its own uniquely-named file, written once).
+bool writeFileAtomic(const char* path, const uint8_t* data, size_t len);
+
+// Directories don't nest-create automatically under SD.mkdir() on this
+// library — creates every path segment in turn. Safe to call when the
+// directory already exists (checks first).
+bool ensureDir(const char* path);
 
 // Reads up to `maxLen` bytes from `path` into `outBuf`. Returns the
 // number of bytes actually read, or -1 if the file doesn't exist / isn't

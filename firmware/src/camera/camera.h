@@ -24,6 +24,16 @@
 
 namespace camera {
 
+// 1280x720 — a real-photo-quality mode for the judging flow's two
+// required captures (see ui/screens/photos_screen.*), distinct from the
+// bring-up test's CAM_IMAGE_MODE_QVGA (320x240, chosen there only for a
+// fast round trip to verify wiring). NOT verified against real hardware
+// at this resolution specifically — the bring-up test never exercised
+// anything above QVGA — so treat this as a starting point to confirm
+// (capture time, file size, SD write duration) once a board is
+// available, not a settled/tuned value. See DECISIONS.md.
+constexpr int CAPTURE_MODE_PHOTO = 0x08;  // CAM_IMAGE_MODE_HD, per Arducam_Mega's ArducamCamera.h
+
 enum class CameraState {
     UNINITIALIZED,
     INITIALIZING,
