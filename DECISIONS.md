@@ -1577,7 +1577,104 @@ building on top of it. Newest entries at the top of each section.
      a reload surviving via localStorage) are unverified until someone opens
      `/simulator` in an actual browser.
 
+- **INT1 — End-to-end test: a headless handheld simulator, a 310-car/4-handheld
+  simulated show, a mid-show range-escalation narrative, a deliberate Top Awards
+  tie, a folder photo import, an offline page-render sweep, and a show-day
+  runbook.** All Home Base only — no firmware code changed.
+  1. **`homebase/tests/handheld_simulator.py`'s `SimulatedHandheld` is built on
+     the SAME foundation the existing test suite already calls "the real API"** —
+     `conftest.py`'s `client` fixture (a `TestClient` against the real FastAPI app,
+     a real if in-memory database) — not a live `uvicorn` subprocess. Confirmed
+     this project already treats that as ground truth before designing around it:
+     `test_sync_idempotency.py`'s own docstring says exactly this. This is also
+     what makes a 310-car simulated show run in ~2 seconds and stay deterministic
+     enough to be a real regression suite, not a one-off demo script. It implements
+     PROTOCOL.md's trigger model and idempotency rule as a third independent copy
+     (firmware's `wifi_sync.cpp`, SIM1's `sync.js`, now this) — a real cross-check
+     that the contract is actually unambiguous, not just documented that way.
+  2. **A real bug was found and fixed BEFORE this task started**, while verifying
+     SIM1 (see that entry above): `services/cars.py::add_cars()` wasn't flushing
+     newly-added cars before its own `check_and_escalate()` count query (autoflush
+     is off — `app/db.py`), so a 150+/300+-car add silently never escalated the
+     range. INT1's mid-show escalation test uses the real, now-fixed `add_cars()`
+     rather than a hand-rolled insert loop specifically so a regression here would
+     be caught automatically — this test would have failed against the old bug.
+  3. **Deliberately does NOT duplicate existing unit-level coverage** — confirmed by
+     reading it first: `test_range_escalation.py::test_escalation_full_scenario`
+     already unit-tests `check_and_escalate()` directly (140+20 cars, conversion,
+     idempotency, "never lowers"); `test_results.py` already unit-tests
+     `compute_top_awards()`'s tie logic directly, including CONTEXT.md's own
+     "4 cars tied for the last 2 places" example. INT1's versions of both are the
+     END-TO-END angle those can't reach: real sync-API submissions, real multiple
+     concurrent handhelds, and — for range escalation specifically — a handheld
+     that judged a car BEFORE the escalation but doesn't sync until AFTER,
+     converting on arrival, which no existing test reached.
+  4. **Top Awards ties are confirmed BY DESIGN to not gate Finish Show** — read
+     `services/finish_show.py` and CONTEXT.md's "Protecting completed work"
+     together: CONTEXT.md only requires Show Awards to be resolved before
+     finishing. `tests/test_top_awards_tie_cutoff.py` asserts this explicitly
+     (`finish_show()` succeeds with an unresolved tie still sitting on `/results`)
+     so a future change to that gate has to consciously break this test, not drift
+     silently. The actual "told plainly, not guessed" requirement is real and
+     already correctly built — confirmed by asserting the live `/results` page
+     renders CONTEXT.md's exact wording, not just checking the service-layer
+     dataclass.
+  5. **`services/sd_card_watcher.py::scan_and_ingest_drive()` opens its own
+     `SessionLocal()`** rather than accepting an injected session, so it can't run
+     against an in-memory test database. `tests/test_photo_import_folder.py` drives
+     the same two real functions that wrapper calls (`find_candidate_photo_files` +
+     `ingest_photo_file`) directly instead — the actually-meaningful behavior for a
+     folder scan, not a mock of `scan_and_ingest_drive` itself.
+  6. **Offline check, static half: zero external references found.**
+     `grep -rE "https?://" homebase/app/templates homebase/app/static` (excluding
+     `127.0.0.1`/`localhost`) returns nothing. `requirements.txt` is fully pinned.
+     No CDN/Google Fonts/unpkg/jsdelivr reference exists anywhere in `app/`.
+     `tests/test_offline_page_smoke.py` adds the dynamic half: every GET page route
+     renders (200, no exception) through `TestClient`, which makes no real socket
+     of any kind — concrete evidence every screen works with zero connectivity, not
+     an absence-of-CDN-link inference. **One real finding, not fixed here:** the
+     three "Archivo" weight files (`archivo-600/700/800.woff2`) are byte-identical
+     (same MD5), and so are the three IBM Plex Sans weight files
+     (`ibm-plex-sans-400/500/600.woff2`) — vendored as placeholders, not yet the
+     real distinct weights. This does not break offline-ness (still zero network
+     calls, all local files) but the type system isn't visually correct yet.
+     README.md's own offline prep checklist already has this as an unchecked item
+     ("Font files: download the Archivo and IBM Plex Sans/Mono `.woff2` files") —
+     this is a pre-existing acknowledged gap, not a new regression, and fetching
+     the real files needs a deliberate one-time online step this task didn't take.
+  7. **The literal "open DevTools, watch the Network tab, physically disconnect
+     the internet" check was NOT performed** — this environment has no browser and
+     no network to switch off. What replaced it: the static grep sweep (point 6)
+     plus the dynamic page-render sweep, which is strong evidence but not the same
+     kind of proof. That physical, one-time confirmation is now a runbook step
+     (`docs/show-day-runbook.md`, section 1) rather than silently skipped.
+  8. **`docs/show-day-runbook.md` is new** — written for someone other than whoever
+     built this, outdoors, under time pressure: router setup, starting Home Base
+     (including the `--host 0.0.0.0` detail, without which no handheld can ever
+     reach it — confirmed by reading `app/main.py`, which has no `uvicorn.run()`
+     of its own, so the actual startup command matters), handheld provisioning
+     (the real on-device Settings labels — confirmed by reading
+     `firmware/src/ui/screens/settings_screen.cpp` — "Show Wi-Fi Name," "Show
+     Wi-Fi Password," "Home Base Address," with the real default
+     `192.168.8.1:8000` from `firmware/src/storage/settings.h`), and one
+     subsection per named failure mode from the task, each ending in a concrete
+     action against the real screen names (Handhelds, Conflicts, Cars, Photos).
+  9. **Full suite result:** `pytest tests/ -q` → 218 passed (the pre-existing
+     suite plus every INT1 addition), 0 failures, 0 skips.
+
 ## Open
+
+- **The vendored web fonts are placeholders, not the real distinct weights (INT1).**
+  `homebase/app/static/fonts/archivo-600/700/800.woff2` are byte-identical (same
+  MD5), and so are `ibm-plex-sans-400/500/600.woff2` — only the two IBM Plex Mono
+  weights are genuinely distinct files. Offline-ness itself is unaffected (all
+  local files, zero network calls either way), but Archivo/IBM Plex Sans render at
+  only one real weight everywhere on the web UI today. README.md's own offline
+  prep checklist already lists this as an unchecked step ("Font files: download
+  the Archivo and IBM Plex Sans/Mono `.woff2` files") — not a new regression,
+  just newly confirmed by byte-comparing the files directly. Needs a deliberate,
+  one-time online step (the real font downloads) before a real show, not a code
+  fix.
 
 - **True deep sleep between cars is deferred to a future "End of Day" state (F7) —
   blocked on the same GPIO38/Camera-CS continuity check already on this list.**
