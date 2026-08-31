@@ -185,4 +185,57 @@ bool saveEntries(const Entry* entries, int count) {
     return ok;
 }
 
+bool mergeEntries(const Entry* delta, int deltaCount) {
+    if (deltaCount <= 0) return true;  // nothing to merge — not an error, just a no-op sync response
+
+    size_t len = 0;
+    uint8_t* buf = readWholeFile(ENTRIES_PATH, MAX_ENTRIES_FILE_SIZE, &len);
+
+    DynamicJsonDocument doc(len > 0 ? len * 3 + 1024 : 1024);
+    bool haveExisting = false;
+    if (buf != nullptr) {
+        haveExisting = !deserializeJson(doc, buf, len);
+        free(buf);
+    }
+
+    // Worst case every existing entry survives (none superseded) plus
+    // every delta entry — a generous, never-short heap array; freed
+    // before returning either way.
+    int existingCount = haveExisting ? doc.as<JsonArrayConst>().size() : 0;
+    auto* merged = new Entry[existingCount + deltaCount];
+    int mergedCount = 0;
+
+    if (haveExisting) {
+        for (JsonVariantConst e : doc.as<JsonArrayConst>()) {
+            const char* num = e["entry_number"] | "";
+            bool supersededByDelta = false;
+            for (int i = 0; i < deltaCount; i++) {
+                if (strcmp(delta[i].entryNumber, num) == 0) {
+                    supersededByDelta = true;
+                    break;
+                }
+            }
+            // A delta entry always wins outright — Home Base already
+            // applied its own "fill or correct" rule (PROTOCOL.md) before
+            // sending this back, so the delta IS the current truth for
+            // that entry number, not just a hint to merge field-by-field.
+            if (supersededByDelta) continue;
+
+            Entry& out = merged[mergedCount++];
+            copyStr(out.entryNumber, sizeof(out.entryNumber), e["entry_number"]);
+            copyStr(out.participant, sizeof(out.participant), e["participant"]);
+            copyStr(out.year, sizeof(out.year), e["year"]);
+            copyStr(out.make, sizeof(out.make), e["make"]);
+            copyStr(out.model, sizeof(out.model), e["model"]);
+            copyStr(out.vehicleType, sizeof(out.vehicleType), e["vehicle_type"]);
+        }
+    }
+
+    for (int i = 0; i < deltaCount; i++) merged[mergedCount++] = delta[i];
+
+    bool ok = saveEntries(merged, mergedCount);
+    delete[] merged;
+    return ok;
+}
+
 }  // namespace storage

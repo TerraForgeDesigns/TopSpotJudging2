@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "sd_card.h"
@@ -53,6 +54,9 @@ void applyLine(char* line, Settings* out) {
         setField(out->homeBaseAddress, sizeof(out->homeBaseAddress), value);
     } else if (strcmp(key, "theme") == 0) {
         out->theme = (strcmp(value, "daylight") == 0) ? ThemeChoice::Daylight : ThemeChoice::Dark;
+    } else if (strcmp(key, "sync_interval_seconds") == 0) {
+        int parsed = atoi(value);
+        if (parsed > 0) out->syncIntervalSeconds = parsed;  // 0/garbage keeps the struct default rather than a dead timer
     }
     // An unrecognized key is left alone, not an error — forward-compatible
     // with a settings file written by a newer/older firmware version.
@@ -93,9 +97,11 @@ bool saveSettings(const Settings& settings) {
                         "wifi_ssid=%s\n"
                         "wifi_password=%s\n"
                         "home_base_address=%s\n"
-                        "theme=%s\n",
+                        "theme=%s\n"
+                        "sync_interval_seconds=%d\n",
                         settings.handheldLabel, settings.judgeName, settings.wifiSsid, settings.wifiPassword,
-                        settings.homeBaseAddress, settings.theme == ThemeChoice::Daylight ? "daylight" : "dark");
+                        settings.homeBaseAddress, settings.theme == ThemeChoice::Daylight ? "daylight" : "dark",
+                        settings.syncIntervalSeconds);
     if (len <= 0 || static_cast<size_t>(len) >= sizeof(buf)) return false;
     return writeFileAtomic(SETTINGS_PATH, reinterpret_cast<const uint8_t*>(buf), static_cast<size_t>(len));
 }

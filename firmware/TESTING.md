@@ -126,6 +126,56 @@ changed: `python firmware/tools/merge_seed_source.py` then
    range — it must stay open with Done disabled and the "Not a plausible
    year" hint shown, not silently accept it.
 
+## WiFi sync (F5)
+
+**Setup**: a running Home Base instance on the show LAN, `Settings.wifiSsid`/
+`wifiPassword`/`homeBaseAddress` pointed at it, at least one finished car queued.
+None of this can be exercised in this environment — no board, no live AP, no Home
+Base instance reachable from here. Everything below is unverified until run on real
+hardware; the code is traceable against PROTOCOL.md and the task spec, which is as
+far as this environment can confirm it.
+
+1. **Out of range, then back in range.** Keep the handheld's configured SSID
+   unreachable — confirm the status bar stays on whatever it last showed (no
+   flicker to "Updating" on a scan-only miss), and that `Settings screen` > `Update
+   Check Interval`'s value visibly governs how often a periodic attempt fires (watch
+   serial log timestamps, or add a temporary log line). Bring the AP into range —
+   confirm the very next periodic tick or an "Update Now" tap picks it up
+   immediately, no waiting for a doubled interval to expire.
+2. **Backoff actually doubles and caps.** With the AP OFF the whole time, confirm
+   successive periodic misses roughly double the wait (starting from Settings'
+   configured base) up to 900s (15 min), never beyond.
+3. **A finished car never waits on backoff.** Set the interval artificially high
+   (15 min), then finish judging a car — confirm the sync attempt fires immediately
+   (trigger (a)), not after the full interval.
+4. **Home Base down, AP up.** Run the AP but stop Home Base (or block port 8000) —
+   confirm the queue is completely untouched afterward (car count on Home screen
+   unchanged) and a toast reading "Home Base Not Connected" appears.
+5. **Queue actually drains on success.** With Home Base up, confirm every currently
+   queued car disappears from Home screen's "N cars waiting to send" line after a
+   successful sync, and appears as a real judged car in Home Base's own Cars list.
+6. **Re-submitting a car Home Base already has** (e.g. force a retry by killing the
+   handheld's WiFi mid-attempt on a PREVIOUS run before this one) must come back
+   `already_recorded` and still clear the queue entry — never treated as a
+   duplicate conflict.
+7. **Two handhelds, same car.** Judge the same entry number to completion on two
+   handhelds — the second one to sync should see it removed from ITS queue with a
+   small toast, and Home Base's Cars list should show that car flagged for the host
+   to resolve, never silently overwritten.
+8. **Scoring Updated notice.** While a car is queued and the judge is mid-way
+   through judging a DIFFERENT car, escalate the show's range on Home Base (add
+   enough cars, or however Home Base's own UI triggers it) and let a sync land —
+   confirm the full-screen notice appears with the correct new range number, the
+   judge is still on the same in-progress car underneath after tapping Continue, and
+   the Judge Car screen's buttons show the new range immediately with no restart.
+9. **Show Setup Updated toast.** Change something in Show Setup that ISN'T the
+   range (rename a category, add an award) — confirm a plain "Show Setup Updated"
+   toast, not the full-screen notice.
+10. **20-minute warning.** Prevent any successful sync for over 20 minutes (AP off,
+    or Home Base down) with at least one queued car — confirm the Home screen shows
+    the prominent "Your scores are saved on this device..." banner, and that it
+    goes away again once a sync actually succeeds.
+
 ## Non-crash-safety checks
 
 Each bring-up target's own header comment (`bringup_display.cpp`,

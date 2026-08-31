@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <cstring>
 
+#include "network/wifi_sync.h"
 #include "storage/pending_queue.h"
 #include "storage/settings.h"
 
@@ -63,6 +64,7 @@ bool finish() {
 
     storage::deleteDraft(g_draft.entryNumber);
     g_active = false;
+    network::sync::requestNow();  // trigger (a): a car was just finished — try immediately, ignoring backoff
     return true;
 }
 

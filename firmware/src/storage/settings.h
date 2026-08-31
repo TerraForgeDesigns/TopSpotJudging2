@@ -22,6 +22,14 @@ struct Settings {
     char wifiPassword[64] = "";
     char homeBaseAddress[64] = "192.168.8.1:8000";  // the GL.iNet router's default LAN gateway
     ThemeChoice theme = ThemeChoice::Dark;
+    // The BASE interval network::sync's periodic trigger checks at when
+    // out of range — PROTOCOL.md: "default 3 minutes, configurable," and
+    // the task's own instruction: "from settings, not hardcoded." Doubles
+    // (capped at 900s/15min) on a miss and resets back to exactly this
+    // value on a hit — see network/wifi_sync.h. Settings screen exposes
+    // this in whole minutes (1-15); stored here in seconds to match
+    // storage::SyncState::currentRetryIntervalSeconds' own unit.
+    int syncIntervalSeconds = 180;
 };
 
 // Loads /settings.txt. Missing/unreadable/malformed lines are never a

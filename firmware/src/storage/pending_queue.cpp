@@ -53,6 +53,73 @@ size_t serializeCar(const QueuedCar& car, char* buf, size_t bufSize) {
     return serializeJson(doc, buf, bufSize);
 }
 
+// The read-side mirror of serializeCar() — used by listQueuedCars(), not
+// by checkQueueIntegrity() (which only needs to know a file parses at
+// all, not what's in it). Returns false on any malformed/missing
+// required field; `out` is left however JSON's own defaults leave it in
+// that case, which the caller (listQueuedCars) simply skips rather than
+// forwarding a half-populated car to Home Base.
+bool deserializeCar(JsonDocument& doc, QueuedCar* out) {
+    const char* entryNumber = doc["entry_number"] | "";
+    if (entryNumber[0] == '\0') return false;
+    strncpy(out->entryNumber, entryNumber, sizeof(out->entryNumber) - 1);
+    strncpy(out->judgeName, doc["judge_name"] | "", sizeof(out->judgeName) - 1);
+    out->closedAtUptimeMs = doc["closed_at_uptime_ms"] | 0;
+    strncpy(out->participant, doc["participant"] | "", sizeof(out->participant) - 1);
+    strncpy(out->year, doc["year"] | "", sizeof(out->year) - 1);
+    strncpy(out->make, doc["make"] | "", sizeof(out->make) - 1);
+    strncpy(out->model, doc["model"] | "", sizeof(out->model) - 1);
+    strncpy(out->vehicleType, doc["vehicle_type"] | "", sizeof(out->vehicleType) - 1);
+    out->makeManuallyEntered = doc["make_manually_entered"] | false;
+    out->modelManuallyEntered = doc["model_manually_entered"] | false;
+    out->scoreRangeMax = doc["score_range_max"] | 5;
+
+    out->scoreCount = 0;
+    for (JsonVariantConst s : doc["scores"].as<JsonArrayConst>()) {
+        if (out->scoreCount >= MAX_QUEUED_SCORES) break;
+        out->scores[out->scoreCount].categoryId = s["category_id"] | 0;
+        out->scores[out->scoreCount].points = s["points"] | 0;
+        out->scoreCount++;
+    }
+
+    JsonVariantConst oi = doc["overall_impression"];
+    out->hasOverallImpression = !oi.isNull();
+    out->overallImpression = oi.isNull() ? 0 : oi.as<int>();
+
+    out->nominationCount = 0;
+    for (JsonVariantConst id : doc["nominations"].as<JsonArrayConst>()) {
+        if (out->nominationCount >= MAX_QUEUED_NOMINATIONS) break;
+        out->nominations[out->nominationCount++] = id.as<int>();
+    }
+    return true;
+}
+
+// Shared by isEntryQueued() and removeQueuedCarByEntryNumber() — the
+// filename match (entry number followed by '_', not just a prefix, so
+// "042" doesn't false-match a real "0420...") is the one piece of logic
+// both need identically.
+bool findQueuedPath(const char* entryNumber, String* outPath) {
+    if (!isMounted()) return false;
+    File dir = SD.open(QUEUE_DIR);
+    if (!dir || !dir.isDirectory()) return false;
+
+    size_t prefixLen = strlen(entryNumber);
+    bool found = false;
+    File entry = dir.openNextFile();
+    while (entry && !found) {
+        String name = entry.name();
+        entry.close();
+        if (name.length() > prefixLen && name.startsWith(entryNumber) && name.charAt(prefixLen) == '_' &&
+            name.endsWith(".json")) {
+            found = true;
+            *outPath = String(QUEUE_DIR) + "/" + name;
+        }
+        entry = dir.openNextFile();
+    }
+    dir.close();
+    return found;
+}
+
 }  // namespace
 
 bool enqueueCar(const QueuedCar& car) {
@@ -91,26 +158,8 @@ int countQueued() {
 }
 
 bool isEntryQueued(const char* entryNumber) {
-    if (!isMounted()) return false;
-    File dir = SD.open(QUEUE_DIR);
-    if (!dir || !dir.isDirectory()) return false;
-
-    size_t prefixLen = strlen(entryNumber);
-    bool found = false;
-    File entry = dir.openNextFile();
-    while (entry && !found) {
-        String name = entry.name();
-        entry.close();
-        // Filenames are "{entry_number}_{closed_at_uptime_ms}.json" — a
-        // match requires the entry number followed by '_', not just a
-        // prefix match (so "042" doesn't false-match a real "0420...").
-        if (name.length() > prefixLen && name.startsWith(entryNumber) && name.charAt(prefixLen) == '_') {
-            found = true;
-        }
-        entry = dir.openNextFile();
-    }
-    dir.close();
-    return found;
+    String path;
+    return findQueuedPath(entryNumber, &path);
 }
 
 QueueIntegrityReport checkQueueIntegrity() {
@@ -150,6 +199,42 @@ QueueIntegrityReport checkQueueIntegrity() {
     }
     dir.close();
     return report;
+}
+
+int listQueuedCars(QueuedCar* out, int maxOut) {
+    if (!isMounted()) return 0;
+    File dir = SD.open(QUEUE_DIR);
+    if (!dir || !dir.isDirectory()) return 0;
+
+    int count = 0;
+    File entry = dir.openNextFile();
+    while (entry && count < maxOut) {
+        String name = entry.name();
+        String fullPath = String(QUEUE_DIR) + "/" + name;
+        size_t size = entry.size();
+        entry.close();
+
+        if (name.endsWith(".json")) {
+            uint8_t buf[MAX_CAR_FILE_SIZE];
+            int n = readFile(fullPath.c_str(), buf, sizeof(buf) - 1);
+            if (n > 0 && static_cast<size_t>(n) == size) {
+                buf[n] = '\0';
+                StaticJsonDocument<MAX_CAR_FILE_SIZE * 2> doc;
+                if (!deserializeJson(doc, buf, n) && deserializeCar(doc, &out[count])) {
+                    count++;
+                }
+            }
+        }
+        entry = dir.openNextFile();
+    }
+    dir.close();
+    return count;
+}
+
+bool removeQueuedCarByEntryNumber(const char* entryNumber) {
+    String path;
+    if (!findQueuedPath(entryNumber, &path)) return false;
+    return SD.remove(path);
 }
 
 }  // namespace storage

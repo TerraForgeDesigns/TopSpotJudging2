@@ -3,8 +3,12 @@
 #include <cstdint>
 #include <cstring>
 
+#include <cstdio>
+#include <cstdlib>
+
 #include "../components/button.h"
 #include "../components/list_row.h"
+#include "../components/numeric_keypad_overlay.h"
 #include "../components/text_keyboard.h"
 #include "../fonts/fonts.h"
 #include "../theme.h"
@@ -18,6 +22,19 @@ namespace {
 // overlay's void* ctx since it (like every F2 component) is a plain C
 // callback, not a capturing lambda.
 enum class Field { HandheldLabel, JudgeName, WifiSsid, WifiPassword, HomeBaseAddress };
+
+// network::sync's periodic trigger doubles this on a miss, capped at
+// 15 minutes (see storage/settings.h) — a base already at or above the
+// cap would never actually back off, so it's validated here, not just
+// silently clamped.
+constexpr int MIN_SYNC_INTERVAL_MINUTES = 1;
+constexpr int MAX_SYNC_INTERVAL_MINUTES = 15;
+
+bool isValidSyncInterval(const char* text) {
+    if (text[0] == '\0') return false;
+    int minutes = atoi(text);
+    return minutes >= MIN_SYNC_INTERVAL_MINUTES && minutes <= MAX_SYNC_INTERVAL_MINUTES;
+}
 
 // Module-static, not a build()-local — the row callbacks below fire
 // later, asynchronously, after build() has already returned. A pointer
@@ -55,6 +72,20 @@ void onEditWifiSsid(void* ctx) { editField(Field::WifiSsid, static_cast<const ch
 void onEditWifiPassword(void* ctx) { editField(Field::WifiPassword, static_cast<const char*>(ctx), "Show Wi-Fi password"); }
 void onEditHomeBaseAddress(void* ctx) {
     editField(Field::HomeBaseAddress, static_cast<const char*>(ctx), "Home Base address");
+}
+
+void onSyncIntervalSaved(void* /*ctx*/, const char* text, bool accepted) {
+    if (!accepted) return;
+    g_settings.syncIntervalSeconds = atoi(text) * 60;
+    storage::saveSettings(g_settings);
+    screen_manager::refresh();
+}
+
+void onEditSyncInterval(void* /*ctx*/) {
+    char current[4];
+    snprintf(current, sizeof(current), "%d", g_settings.syncIntervalSeconds / 60);
+    components::numericKeypadOverlay(current, "Minutes", /*maxLen=*/2, /*autoAcceptLen=*/0, isValidSyncInterval,
+                                      "Enter 1 to 15 minutes.", onSyncIntervalSaved, nullptr);
 }
 
 void onThemeDark(lv_event_t*) {
@@ -95,6 +126,11 @@ void SettingsScreen::build(lv_obj_t* content) {
                          onEditWifiPassword, g_settings.wifiPassword);
     components::listRow(content, "Home Base Address", g_settings.homeBaseAddress, components::RowDot::None,
                          onEditHomeBaseAddress, g_settings.homeBaseAddress);
+
+    char intervalBuf[32];
+    snprintf(intervalBuf, sizeof(intervalBuf), "%d minutes", g_settings.syncIntervalSeconds / 60);
+    components::listRow(content, "Update Check Interval", intervalBuf, components::RowDot::None, onEditSyncInterval,
+                         nullptr);
 
     lv_obj_t* themeLabel = lv_label_create(content);
     lv_obj_add_style(themeLabel, theme::textSecondary(), 0);

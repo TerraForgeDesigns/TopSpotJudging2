@@ -1105,6 +1105,147 @@ building on top of it. Newest entries at the top of each section.
       `verify_curated_classic.py` will simply fail loudly (network errors), never
       silently produce bad data.
 
+- **F5 — Handheld WiFi sync: scan-first, backoff-aware, never-lose-a-queued-car,
+  against Home Base's already-live `POST /api/v1/sync`.** `firmware/src/network/
+  wifi_sync.h`'s stale placeholder (referencing the old two-endpoint protocol) is
+  replaced with the real thing. See each point below for one design decision.
+  1. **Confirmed against the ACTUAL running Home Base code, not just PROTOCOL.md's
+     prose, before writing a line of firmware — and found one real drift.**
+     `homebase/app/api/schemas.py`'s real `ConfigurationOut` does NOT include
+     `show_id`/`event_date` yet, despite PROTOCOL.md's example JSON showing them
+     (added in F4's entry as a documented, docs-only, aspirational change with no
+     homebase code behind it). `wifi_sync.cpp` parses both defensively (`config
+     ["show_id"] | before.showId`, ArduinoJson's standard default operator) — they
+     simply stay whatever they already were until Home Base's schema catches up to
+     its own documentation. Everything else (the four `results[]` status values,
+     server-side range conversion behavior, the total absence of any "Update Now"
+     concept server-side) matched PROTOCOL.md exactly.
+  2. **The background task touches NEITHER LVGL NOR storage — not even to build its
+     own request body.** The original plan draft had the task doing "WiFi scan,
+     WiFi connect, HTTP POST" without being explicit about who builds the request
+     JSON; implementing it honestly surfaced a real concurrency hazard: if the task
+     read `storage::Settings`/`SyncState`/the queue itself, that's SD/SPI access
+     that could race with the MAIN thread also touching the SD card at the exact
+     moment a judge is saving a draft or a photo — this module deliberately does
+     NOT block the main thread the way `camera.cpp`'s poll-loop precedent does (see
+     point 3), so that race is real, not theoretical. Fix: `buildRequestBody()`
+     (all storage reads) runs on the MAIN thread, synchronously, in the same call
+     that triggers a sync attempt — fast (a few small file reads), and finishes
+     before the task is even created. The task receives an already-serialized JSON
+     buffer and a URL; it does scan/connect/POST/read-response and NOTHING else.
+     Applying the result (`applyHit()`/`applyMiss()` — every storage write, every
+     status bar/toast/screen call) happens back on the main thread too, from a
+     short-period (150ms) LVGL timer polling a `volatile bool done` flag — the same
+     ownership split as `camera.cpp`'s `CaptureContext`, just with the boundary
+     drawn to keep ALL storage/LVGL access single-threaded, not just LVGL.
+  3. **Deliberately NOT `camera.cpp`'s pattern of the caller blocking (via a
+     `delay()` poll-loop) until the task finishes — a real, reasoned deviation from
+     this project's own established precedent, not an oversight.** Camera capture is
+     always a judge-initiated, foreground wait (they're looking at the Photos
+     screen, expecting it to take a moment). Trigger (b) — the periodic timer — is
+     the opposite: it fires unprompted while the judge could be mid-keystroke on any
+     screen. Blocking the single LVGL thread for the 1-5 seconds a real scan+connect
+     +POST can take would freeze touch input at an unpredictable moment, which is a
+     worse regression than the camera's contained, expected wait. Hence the
+     completion-poll-timer design in point 2 instead of a blocking wait.
+  4. **`storage::SyncState::currentRetryIntervalSeconds` (already existed, unused
+     until now) is the ONLY thing the periodic trigger ever mutates** — doubles
+     (capped at 900s/15min) on a miss, resets to `Settings.syncIntervalSeconds` on a
+     hit. Triggers (a)/(c) (`network::sync::requestNow()`) run the identical routine
+     but NEVER touch this value either way, on a hit OR a miss — matching the task's
+     explicit "never apply backoff to a just-finished-car trigger," extended to
+     Update Now by the same reasoning (a judge manually checking shouldn't
+     inappropriately double the periodic schedule just because they happened to
+     check while still out of range). A SUCCESSFUL sync from ANY trigger still
+     resets the interval to base — reaching Home Base is real information the
+     periodic schedule should reflect regardless of what caused the attempt.
+  5. **`Settings.syncIntervalSeconds` is new** (default 180s, matching PROTOCOL.md's
+     documented default) — the task's own "from settings, not hardcoded"
+     instruction. Exposed on Settings screen in whole minutes (1-15; validated, not
+     silently clamped — a base at or above the 15-minute cap would never actually
+     back off, which would silently defeat the whole point of a configurable base).
+  6. **Status vocabulary: the status bar's existing terse pill words (`UP TO DATE`/
+     `UPDATING`/`NOT CONNECTED`) are UNCHANGED** — no added ellipsis on "Updating"
+     despite the task listing "Updating..." — because LANGUAGE.md's own recurring-
+     state-phrasing rule ("a judge who learns what 'Updating' means on the handheld
+     must see the identical word... on Home Base's screen") is a stronger, explicit,
+     already-established constraint than the task's shorthand list, and Home Base's
+     own dashboard pill (confirmed via `services/dashboard.py`) says "Updating" with
+     no ellipsis either. The task's fuller-sentence forms ("Home Base Not
+     Connected," "N cars waiting to send," the 20-minute banner) are read as the
+     SENTENCE-level phrasing LANGUAGE.md's own table distinguishes from the terse
+     status-bar word for the same underlying state — both point at the same state,
+     rendered at two different levels of the UI, not five different states.
+  7. **`error`-status queued cars are deliberately left in the queue forever, not
+     auto-removed and not given resolution UI.** The task's own framing (only
+     "explicitly acknowledged" cars leave the queue; `already_recorded` explicitly
+     called out as counting, `error` conspicuously not mentioned in that list) reads
+     as intentional, and PROTOCOL.md's `error` case is a validation failure the
+     handheld already should have prevented client-side before ever enqueueing (an
+     unscored active category, an out-of-range point value) — expected to be rare
+     to nonexistent in practice. Flagged here as a real gap if it ever DOES happen:
+     that car would sit queued and keep getting re-sent every sync attempt, forever,
+     with no judge-facing indication anything is wrong. Revisit if this ever
+     surfaces at a real show.
+  8. **`battery_pct` is sent as an honest JSON `null`, matching `SyncRequest`'s own
+     `int | None = None`.** No ADC pin has been identified for this board yet
+     (`firmware/src/power/battery.h`, still Open below) — never a fabricated
+     percentage standing in for real hardware that doesn't exist yet.
+  9. **`server_time` sets the device clock via `strptime()` + `settimeofday()`** —
+     no NTP, no network beyond the sync response itself, matching CONTEXT.md's "no
+     NTP time sync... handhelds set their clock from home base's `server_time`."
+  10. **Flash/RAM report** (real `pio run` size output): `bringup-judging` jumps to
+      1,234,117B flash (39.2% of `app0` — up from F4's 756,177B, a ~478,000B
+      increase almost entirely from the WiFi/HTTPClient/TLS-adjacent libraries this
+      is the FIRST task to actually link in) and 107,600B static RAM (32.8%, up
+      from 81,592B). Still comfortably within the 3MB `app0` this project chose to
+      leave untouched back in F4 specifically because "today's firmware is a
+      fraction of the finished product" — this jump is the concrete proof that
+      call was correct: the earlier plan draft that would have shrunk `app0` to
+      2.5MB would have left only ~1.27MB of headroom against a component this
+      size, a real risk this decision avoided. `handheld` (the integrated target,
+      still not calling into `network::` at all) is 459,085B, barely above F4's
+      443,181B — confirms this task's additions are still fully tree-shaken out
+      until `main.cpp` actually calls into them, the same pattern every prior
+      task established.
+  12. **Real bug found and fixed while implementing this task, not part of the
+      original scope: `judge_car_screen.cpp` was unconditionally overwriting
+      `judging::current().scoreRangeMax` from the live show's CURRENT range on
+      every single screen build.** Before this task, that was harmless — nothing
+      could ever change the show's range at runtime, so the value was always
+      identical. This task makes it possible for a sync to escalate the range
+      WHILE a judge has a car open on Judge Car (not yet queued, so none of
+      PROTOCOL.md's server-side conversion-on-receipt logic has run for it) — the
+      old code would have silently relabeled already-entered raw point values onto
+      the new scale with no conversion at all, the exact opposite of "the judge
+      converts nothing" for a car that was NEVER actually sent yet. Fixed: the
+      overwrite now only happens while the draft is still genuinely untouched (no
+      scores entered, no Overall Impression) — matching `judging_session.h`'s own
+      already-documented rule for exactly this ("only applied when starting fresh,
+      since a resumed draft already has whatever range was in effect when it was
+      started"), just not previously enforced at this one call site. Known
+      remaining gap, not fully solved: if a judge has PARTIAL scores at the old
+      range and the show escalates before they finish that same car, the
+      persisted draft data is now safe (never silently corrupted), but the
+      row-vs-grid layout choice and the on-screen Total denominator for the REST
+      of that one screen session still read the show's new range rather than the
+      draft's original one — a display-only inconsistency in a narrow window, not
+      a data-loss or data-corruption one. Flagged here rather than fully chased
+      down, since `score_grid` (the 1-25 layout) has no range parameter at all —
+      properly fixing the display would need touching that component's own design,
+      out of proportion for an edge case this narrow (a sync landing in the exact
+      seconds a judge is on this one screen, mid-car, with a range escalation
+      simultaneously in flight).
+  13. **Physical verification limits — same caveat as every prior firmware task, more
+      acute here than usual.** Nothing in this task can be exercised at all without
+      a real board AND a reachable Home Base instance — no board, no AP, no server
+      available in this environment. `firmware/TESTING.md`'s new F5 section lists
+      ten specific real-hardware checks (backoff doubling/capping, the finished-car
+      trigger bypassing backoff, queue draining, the two-handheld-same-car conflict
+      path, the Scoring Updated notice, the 20-minute banner) — every one of them is
+      currently unverified beyond "compiles and traces correctly against
+      PROTOCOL.md/the task spec," which is the most this environment can confirm.
+
 ## Open
 
 - **`camera::CAPTURE_MODE_PHOTO` (1280x720) is unverified against real hardware.** F3

@@ -83,8 +83,21 @@ struct Entry {
 // a hard error; the judge can still continue.
 bool findEntry(const char* entryNumber, Entry* out);
 
-// Replaces the entire local entry cache — called after a sync pulls a
-// fresh roster (not built yet). Atomic write to /entries.json.
+// Replaces the entire local entry cache — used only when the FULL roster
+// is known at once (e.g. a from-scratch rebuild). A sync response's
+// `cars[]` is a DELTA, not the full roster (see PROTOCOL.md) — use
+// mergeEntries() for that, not this.
 bool saveEntries(const Entry* entries, int count);
+
+// Overlays `delta` onto the existing cache: an entry number already
+// present is replaced with the delta's version (Home Base is always the
+// source of truth once it has an opinion — see PROTOCOL.md's "fill or
+// correct" rule, which Home Base itself already applied before sending
+// this back), one not yet present is added. This is what makes a newly
+// added or corrected entry number immediately available on ENTER CAR with
+// no restart — see network/wifi_sync.h and CONTEXT.md's "add cars any
+// time" rule. Atomic write to /entries.json (via the same saveEntries()
+// path internally).
+bool mergeEntries(const Entry* delta, int deltaCount);
 
 }  // namespace storage

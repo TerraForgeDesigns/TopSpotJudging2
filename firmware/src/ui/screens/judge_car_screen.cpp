@@ -279,7 +279,24 @@ void buildGridLayout(lv_obj_t* content, const storage::ShowInfo& show) {
 void JudgeCarScreen::build(lv_obj_t* content) {
     storage::ShowInfo show;
     storage::loadShowInfo(&show);
-    judging::current().scoreRangeMax = show.scoreRangeMax;  // read at runtime, never hardcoded — see this screen's header comment
+
+    // Adopt the show's CURRENT range only while this draft is still
+    // genuinely untouched (no scores entered yet) — matches
+    // judging_session.h's own documented rule ("only applied when
+    // starting fresh, since a resumed draft already has whatever range
+    // was in effect when it was started"). Before F5 (network sync) this
+    // couldn't matter — the range never changed at runtime. Now it can:
+    // a judge could be mid-way through scoring a car (not yet queued)
+    // when a background sync escalates the show's range. Blindly
+    // overwriting scoreRangeMax here would silently reinterpret
+    // already-entered raw points on a new scale without running them
+    // through the actual conversion formula — see CONTEXT.md's score
+    // conversion section, which describes converting a FINISHED
+    // submission, not silently relabeling an in-progress one.
+    storage::DraftCar& car = judging::current();
+    if (car.scoreCount == 0 && !car.hasOverallImpression) {
+        car.scoreRangeMax = show.scoreRangeMax;
+    }
 
     if (show.scoreRangeMax <= 10) {
         buildRowLayout(content, show);

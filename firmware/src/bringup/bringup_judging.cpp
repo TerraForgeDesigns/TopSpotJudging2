@@ -23,6 +23,7 @@
 
 #include "camera/camera.h"
 #include "display/display.h"
+#include "network/wifi_sync.h"
 #include "storage/sd_card.h"
 #include "storage/vehicle_db.h"
 #include "ui/lvgl_port.h"
@@ -47,6 +48,7 @@ void setup() {
     }
     ui::theme::init();
     ui::screen_manager::init();
+    network::sync::init();  // after screen_manager::init() — sets up LVGL timers and needs the status bar to exist
     ui::screen_manager::push(ui::screens::HomeScreen::create);
 
     Serial.println("[bringup-judging] ready");

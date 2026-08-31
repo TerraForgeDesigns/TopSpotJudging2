@@ -94,4 +94,25 @@ struct QueueIntegrityReport {
 // left untouched — this function reports, it never discards a real car.
 QueueIntegrityReport checkQueueIntegrity();
 
+// Parses every valid queued car under /queue/ into `out` (caller-sized,
+// up to `maxOut`). Returns the count actually written — never more than
+// what's really queued, and silently skips anything checkQueueIntegrity()
+// would classify as a `.tmp` or `unreadable` file (the network sync
+// module calling this only wants real, complete cars to send; integrity
+// diagnostics are checkQueueIntegrity()'s job, not this one's). Used by
+// network::sync to build a POST /api/v1/sync request body — see
+// PROTOCOL.md.
+int listQueuedCars(QueuedCar* out, int maxOut);
+
+// Removes the queued file for `entryNumber` (there is at most one, by
+// construction — ENTER CAR refuses a second attempt at an entry number
+// this device already finished, see isEntryQueued() above). Called ONLY
+// on an explicit Home Base acknowledgement (accepted / already_recorded /
+// flagged_duplicate — see PROTOCOL.md's sync response and
+// network/wifi_sync.h) — never on a network failure, per CONTEXT.md's
+// resilience principle. Returns true if a matching file was found and
+// removed, false if none existed (not itself an error — the caller may
+// be re-processing a response after a partial prior apply).
+bool removeQueuedCarByEntryNumber(const char* entryNumber);
+
 }  // namespace storage
