@@ -100,4 +100,9 @@ bool saveEntries(const Entry* entries, int count);
 // path internally).
 bool mergeEntries(const Entry* delta, int deltaCount);
 
+// How many entries are in the local cache — the diagnostics screen's
+// "entry counts" (ui/screens/diagnostics_screen.h). Parses /entries.json
+// the same way findEntry() does, just counting instead of matching one.
+int countEntries();
+
 }  // namespace storage

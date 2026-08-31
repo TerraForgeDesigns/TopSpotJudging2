@@ -22,6 +22,12 @@ bool begin() {
     return g_mounted;
 }
 
+void unmount() {
+    if (!g_mounted) return;
+    SD.end();
+    g_mounted = false;
+}
+
 bool isMounted() { return g_mounted; }
 
 SdInfo getInfo() {

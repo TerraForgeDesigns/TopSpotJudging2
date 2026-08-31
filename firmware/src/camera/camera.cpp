@@ -3,8 +3,10 @@
 #include <Arducam_Mega.h>
 #include <Arduino.h>
 #include <SPI.h>
+#include <cstring>
 #include <esp_heap_caps.h>
 
+#include "diag/log.h"
 #include "pins.h"
 #include "storage/sd_card.h"
 
@@ -14,9 +16,26 @@ namespace {
 
 constexpr uint32_t POLL_INTERVAL_MS = 20;
 constexpr uint8_t READ_CHUNK = 250;  // library caps a single readBuff() under 255
+constexpr size_t MAX_ERROR_LEN = 96;
 
 Arducam_Mega* g_cam = nullptr;
 volatile CameraState g_state = CameraState::UNINITIALIZED;
+char g_lastError[MAX_ERROR_LEN] = "";
+
+// Persists `msg` for lastError() AND logs it via diag::log() — called
+// from setup()/waitReady()'s single-threaded caller context or from a
+// capture task's own thread. The capture task's writes here are the one
+// exception to "background tasks never touch shared state directly"
+// elsewhere in this firmware: g_lastError is a fixed-size buffer with a
+// single writer at a time (this module never runs two camera operations
+// concurrently — begin()/captureToFile() are the only entry points, and
+// captureToFile() itself refuses to start a second capture while the
+// camera isn't READY), so a plain strncpy is safe without a mutex.
+void setLastError(const char* msg) {
+    strncpy(g_lastError, msg, sizeof(g_lastError) - 1);
+    g_lastError[sizeof(g_lastError) - 1] = '\0';
+    diag::log("[camera] %s", msg);
+}
 
 // ---- init task -------------------------------------------------------
 
@@ -50,6 +69,7 @@ void captureTask(void* pv) {
 
     if (g_cam->takePicture(static_cast<CAM_IMAGE_MODE>(ctx->mode), CAM_IMAGE_PIX_FMT_JPG) != CAM_ERR_SUCCESS) {
         ctx->result.error = "takePicture() failed";
+        setLastError(ctx->result.error);
         ctx->done = true;
         vTaskDelete(nullptr);
     }
@@ -57,6 +77,7 @@ void captureTask(void* pv) {
     uint32_t total = g_cam->getTotalLength();
     if (total == 0) {
         ctx->result.error = "camera reported an empty image";
+        setLastError(ctx->result.error);
         ctx->done = true;
         vTaskDelete(nullptr);
     }
@@ -67,6 +88,7 @@ void captureTask(void* pv) {
     auto* buffer = static_cast<uint8_t*>(heap_caps_malloc(total, MALLOC_CAP_SPIRAM));
     if (buffer == nullptr) {
         ctx->result.error = "PSRAM allocation failed";
+        setLastError(ctx->result.error);
         ctx->done = true;
         vTaskDelete(nullptr);
     }
@@ -82,6 +104,7 @@ void captureTask(void* pv) {
 
     if (offset != total) {
         ctx->result.error = "short read from camera FIFO";
+        setLastError(ctx->result.error);
         heap_caps_free(buffer);
         ctx->done = true;
         vTaskDelete(nullptr);
@@ -92,6 +115,7 @@ void captureTask(void* pv) {
 
     if (!wrote) {
         ctx->result.error = "SD write failed";
+        setLastError(ctx->result.error);
         ctx->done = true;
         vTaskDelete(nullptr);
     }
@@ -102,6 +126,7 @@ void captureTask(void* pv) {
     // record is complete.
     if (!storage::fileExists(ctx->path)) {
         ctx->result.error = "SD verify failed — file missing after write";
+        setLastError(ctx->result.error);
         ctx->done = true;
         vTaskDelete(nullptr);
     }
@@ -128,6 +153,7 @@ bool waitReady(uint32_t timeoutMs) {
             // library's unbounded wait loop — abandon it rather than let
             // it block the rest of the firmware forever. See camera.h.
             g_state = CameraState::UNAVAILABLE;
+            setLastError("camera did not respond during startup — check it is attached");
             return false;
         }
         delay(POLL_INTERVAL_MS);
@@ -151,11 +177,14 @@ CaptureResult captureToFile(const char* path, int mode, uint32_t timeoutMs) {
     while (!ctx.done) {
         if (millis() - start > timeoutMs) {
             if (handle) vTaskDelete(handle);
+            setLastError("capture timed out");
             return CaptureResult{false, 0, "capture timed out"};
         }
         delay(POLL_INTERVAL_MS);
     }
     return ctx.result;
 }
+
+const char* lastError() { return g_lastError; }
 
 }  // namespace camera

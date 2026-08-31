@@ -5,6 +5,7 @@
 #include <cstring>
 #include <esp_heap_caps.h>
 
+#include "../components/alert_banner.h"
 #include "../components/button.h"
 #include "../components/toast.h"
 #include "../fonts/fonts.h"
@@ -99,6 +100,19 @@ void capture(const char* suffix, bool* savedFlag, lv_obj_t* slotContainer, uint8
     char path[32];
     buildPath(suffix, path, sizeof(path));
 
+    // Defense in depth: build() already disables these buttons when the
+    // camera isn't READY (see below), but a defensive re-check here means
+    // this function is correct on its own terms too, not just because
+    // the caller happens to gate it. F6 requirement 6: a missing/failed
+    // camera "blocks photo steps," with a camera-specific message — not
+    // the generic, SD-flavored one below, which is now only reachable for
+    // an actual SD failure with a healthy camera.
+    if (!camera::isReady()) {
+        components::showToast("Camera Problem. Photos cannot be taken right now.", components::ToastSeverity::Error,
+                               4000);
+        return;
+    }
+
     camera::CaptureResult result = camera::captureToFile(path, camera::CAPTURE_MODE_PHOTO);
     if (!result.success) {
         // result.error is a diagnostic string ("SD write failed", "camera
@@ -127,7 +141,7 @@ void onTakeSheetPhoto(lv_event_t*) {
 }
 
 void buildSlot(lv_obj_t* content, const char* title, bool saved, lv_obj_t** outContainer, uint8_t** buf,
-               lv_img_dsc_t* dsc, const char* suffix, lv_event_cb_t onCapture) {
+               lv_img_dsc_t* dsc, const char* suffix, lv_event_cb_t onCapture, bool cameraReady) {
     lv_obj_t* wrap = lv_obj_create(content);
     lv_obj_remove_style_all(wrap);
     lv_obj_add_style(wrap, theme::card(), 0);
@@ -154,6 +168,11 @@ void buildSlot(lv_obj_t* content, const char* title, bool saved, lv_obj_t** outC
 
     lv_obj_t* btn = components::secondaryButton(wrap, saved ? "Retake" : "Take Photo", 200);
     lv_obj_add_event_cb(btn, onCapture, LV_EVENT_CLICKED, nullptr);
+    // F6 requirement 6: a missing/failed camera blocks photo steps —
+    // disabled up front, not just a reactive error after the tap (see
+    // capture()'s own defensive re-check, which stays for the case this
+    // screen was already open when the camera failed mid-session).
+    components::setEnabled(btn, cameraReady);
 }
 
 void onContinue(lv_event_t*) {
@@ -176,6 +195,14 @@ void PhotosScreen::build(lv_obj_t* content) {
 
     storage::DraftCar& car = judging::current();
 
+    bool cameraReady = camera::isReady();
+    if (!cameraReady) {
+        components::alertBanner(
+            content, components::AlertSeverity::Critical,
+            "Camera Problem. Photos cannot be taken on this device right now — try judging this car on another "
+            "handheld instead.");
+    }
+
     lv_obj_t* row = lv_obj_create(content);
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -184,9 +211,9 @@ void PhotosScreen::build(lv_obj_t* content) {
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
     buildSlot(row, "Vehicle Photo", car.carPhotoSaved, &g_carSlot, &g_carPreviewBuf, &g_carPreviewDsc, "car",
-              onTakeCarPhoto);
+              onTakeCarPhoto, cameraReady);
     buildSlot(row, "Judge Sheet Photo", car.sheetPhotoSaved, &g_sheetSlot, &g_sheetPreviewBuf, &g_sheetPreviewDsc,
-              "sheet", onTakeSheetPhoto);
+              "sheet", onTakeSheetPhoto, cameraReady);
 
     lv_obj_t* continueBtn = components::primaryButton(content, "Continue to Review", 320);
     lv_obj_add_event_cb(continueBtn, onContinue, LV_EVENT_CLICKED, nullptr);

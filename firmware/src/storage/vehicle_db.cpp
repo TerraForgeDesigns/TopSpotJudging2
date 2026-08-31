@@ -157,6 +157,14 @@ void init() {
 
 bool seedAvailable() { return g_seedOk; }
 
+bool getSeedInfo(uint16_t* version, uint32_t* makeCount, uint32_t* modelCount) {
+    if (!g_seedOk) return false;
+    *version = g_header->version;
+    *makeCount = g_header->makeCount;
+    *modelCount = g_header->modelCount;
+    return true;
+}
+
 int findMakes(const char* query, MakeMatch* out, int maxOut) {
     int shown = 0;
     int matched = 0;

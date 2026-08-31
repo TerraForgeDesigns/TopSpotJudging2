@@ -176,6 +176,52 @@ far as this environment can confirm it.
     the prominent "Your scores are saved on this device..." banner, and that it
     goes away again once a sync actually succeeds.
 
+## Photo transfer and diagnostics (F6)
+
+None of this can be exercised in this environment — no board, no camera, no live
+Home Base to upload photos to. Everything below is unverified until run on real
+hardware; the code is traceable against the task spec, which is as far as this
+environment can confirm.
+
+1. **Safe removal actually leaves nothing open.** Judge a car with both photos
+   taken, go to Settings > Manage Photos, tap Transfer Photos — confirm "Safe to
+   remove the memory card." appears, then physically pull the card. Reinsert it,
+   tap Card Reinserted, confirm every screen that touches storage works normally
+   again (Home screen's progress number, Enter Car, Settings) — nothing should
+   still think the card is missing.
+2. **WiFi photo transfer resumes, not restarts.** With several untransferred
+   photos and a live Home Base, tap Send Photos over Wi-Fi, watch "Sending photo
+   N of M" advance, then kill WiFi (or Home Base) partway through. Confirm the
+   already-sent photos stay marked transferred (re-open Manage Photos — their
+   count should reflect it), then restore the connection and tap Send Photos
+   over Wi-Fi again — confirm it picks up at the FIRST still-untransferred
+   photo, never re-sending ones already acknowledged.
+3. **Clear Photos actually refuses.** With at least one untransferred photo,
+   confirm the Clear Photos button is disabled. Transfer everything (either
+   path), confirm it becomes enabled, confirm the modal's strong wording and
+   that Cancel leaves every photo untouched. Confirm on the real device: after
+   confirming, the photos are actually gone from the card (check with a card
+   reader) and the manifest file is gone too.
+4. **Camera-absent judging flow.** With NO camera physically attached (or a
+   deliberately disconnected one), confirm: firmware boots normally, display/
+   touch/SD/WiFi/vehicle lookup all work, the full judging flow up through
+   Award Nominations works normally, Photos shows the "Camera Problem" banner
+   with both capture buttons disabled (not just erroring after a tap), and
+   nothing anywhere crashes or reboots. Confirm Diagnostics (see below) shows
+   "Unavailable" and a real last-error message, not blank fields.
+5. **Diagnostics reveal gesture.** Confirm there is NO visible button, icon, or
+   affordance hinting the hint label on Settings is interactive — then confirm a
+   genuine long-press (not a quick tap) opens Diagnostics, and a quick tap does
+   NOT. Confirm every listed fact reads something sensible (not garbage/
+   uninitialized values) with and without WiFi connected, with and without the
+   vehicle seed partition flashed, with and without an SD card present.
+6. **720p capture timing, now with a real transfer cost attached.** DECISIONS.md
+   already flags `CAPTURE_MODE_PHOTO`'s file size/timing as unverified (F3) —
+   this task adds a new reason it matters: confirm a real 720p JPEG's WiFi
+   upload time is tolerable for a judge actually waiting on "Sending photo N of
+   M" for a realistic batch size, not just that the mechanism works for one
+   photo.
+
 ## Non-crash-safety checks
 
 Each bring-up target's own header comment (`bringup_display.cpp`,

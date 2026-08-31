@@ -1246,8 +1246,157 @@ building on top of it. Newest entries at the top of each section.
       currently unverified beyond "compiles and traces correctly against
       PROTOCOL.md/the task spec," which is the most this environment can confirm.
 
+- **F6 — Photo transfer and diagnostics: safe SD removal, WiFi fallback upload,
+  Clear Photos, camera-degradation handling, and a hidden diagnostics screen.**
+  Confirmed via a full Explore pass before designing (no photo manifest existed,
+  `photos_screen.cpp` never checked camera state, no mains-power-detect pin, no
+  logging/version/long-press precedent anywhere) — see each point below.
+  1. **Photo existence is never cached — only the transferred flag is persisted.**
+     `storage/photo_state.h`'s `listPhotos()` does a live SD-root scan for
+     `*_car.jpg`/`*_sheet.jpg` every call, cross-referenced against
+     `/photo_transfer_state.json` (a flat filename array, atomic-written). This
+     mirrors `pending_queue.h`'s own shape deliberately — the filesystem is the
+     one source of truth for WHAT exists; the manifest only ever answers "has this
+     one already been sent," so Clear Photos deleting files can never leave the
+     manifest lying about something that no longer exists (an orphaned manifest
+     entry for a deleted file is simply never looked up again).
+  2. **The WiFi-upload background task touches NEITHER storage NOR LVGL — same
+     discipline as F5's `wifi_sync`, for a related but distinct reason.** F5's
+     task avoided storage access because an unprompted periodic sync could race a
+     judge's own SD writes. Here, the risk is different: this IS a judge-watched
+     foreground action (the screen stays open showing "Sending photo N of M"), but
+     `network::sync`'s OWN periodic timer keeps running regardless of which screen
+     is showing — a naive design would race THAT timer's storage reads/writes.
+     `network/photo_upload.cpp`'s task receives an already-built multipart body
+     (the main thread reads the photo file and constructs it); the task only does
+     the HTTP POST.
+  3. **Unlike `wifi_sync.cpp`, WiFi stays associated ACROSS the whole batch, not
+     per-attempt.** A real design correction made while implementing, not part of
+     the original plan: the first draft mirrored `wifi_sync.cpp`'s
+     connect-POST-disconnect cycle per photo, which would pay a full WiFi
+     handshake (potentially 1-3+ seconds) for every single photo in a batch that
+     can run into the hundreds — directly undermining "Sending photo 34 of 88"
+     reading as a reasonably brisk process. Fixed: each per-photo task checks
+     `WiFi.status()` first and only reconnects if not already associated;
+     `stopBatch()` (main thread, called once at the end or on a failure) is the
+     only place that actually disconnects and turns the radio off.
+  4. **Resumable by construction, not by any special resume logic.**
+     `storage::markTransferred()` is called immediately after each individual
+     photo's 200 response (main thread, from the poll timer) — never batched to
+     the end. An interrupted transfer simply has fewer transferred entries in the
+     manifest; the next "Send Photos over Wi-Fi" tap's `listPhotos()` scan
+     naturally excludes everything already marked, with no separate "where did I
+     leave off" bookkeeping needed.
+  5. **No mains/USB-power-detect signal exists on this board — confirmed by
+     re-checking `pins.h` and DECISIONS.md directly, not assumed.** Same class of
+     gap as the already-Open battery ADC pin. The WiFi-fallback screen shows a
+     plain informational note ("This uses more power — best done with the device
+     connected to power.") instead of a conditional warning gated on hardware
+     that doesn't exist — never a guessed GPIO. New Open item below, mirroring the
+     battery entry's own "not guessing a pin" stance exactly.
+  6. **Camera degradation: `photos_screen.cpp` now checks `camera::isReady()`
+     BEFORE offering the capture buttons, not just after a failed tap.** The old
+     behavior (confirmed during research) let a judge tap Take Photo with no
+     camera attached and see "Photos cannot be saved. Storage is not available."
+     — worded for an SD failure, shown for the wrong reason. Now: an upfront
+     `alertBanner` (Critical) plus both buttons disabled via
+     `components::setEnabled()` when the camera isn't `READY`; `capture()` keeps a
+     defensive re-check (in case the camera fails mid-session while this screen
+     is already open) with the correctly-worded "Camera Problem" message. The
+     photo-required-before-finish rule from F3 is untouched — a judge without a
+     working camera correctly cannot finish that car's photos, but every other
+     screen (Enter Car, Vehicle Details, Judge Car, Award Nominations, Home,
+     Settings, vehicle search, WiFi sync) was already camera-independent before
+     this task (confirmed: zero `camera::` references anywhere outside
+     `photos_screen.cpp`) and remains so.
+  7. **`camera::lastError()` is new persisted state, not a redesign of the module.**
+     `CaptureResult::error` was always transient (returned once, from the one
+     call that produced it). A single `char g_lastError[96]` module-static, set at
+     every existing failure point (`begin()`'s timeout, every `captureTask()`
+     failure branch, `captureToFile()`'s own timeout) via a `setLastError()`
+     helper that also calls the new `diag::log()`. Safe to write from the capture
+     task's own thread without a mutex: this module never runs two camera
+     operations concurrently (`captureToFile()` itself refuses to start a second
+     capture while not `READY`), and — because `captureToFile()`'s own caller
+     blocks the main thread via a `delay()` poll loop the whole time (unchanged
+     from F1/F3) — LVGL's timer system (and therefore every OTHER module's own
+     `diag::log()` calls, e.g. `network::sync`'s) is provably not running during
+     that exact window either, so there's no concurrent writer to race against.
+  8. **`diag::log()` is a small, deliberately-NOT-comprehensive ring buffer (40
+     lines x 96 chars, static, no heap churn) — wired into only the highest-value
+     call sites** (camera failures — doubling as `lastError()`'s backing store —
+     SD mount/unmount, `network::sync`'s and `photo_upload`'s attempt outcomes),
+     not a retrofit of every existing `Serial.printf()` call across the codebase.
+     That full retrofit would be a large, mostly out-of-scope refactor for what
+     the diagnostics screen's log viewer actually needs; flagged here as a
+     deliberate scope decision, not an oversight.
+  9. **The diagnostics reveal gesture is a genuinely new LVGL event for this
+     codebase.** Grepped first — no `LV_EVENT_LONG_PRESSED` usage existed
+     anywhere. Attached to Settings' existing bottom hint label, which needed
+     `LV_OBJ_FLAG_CLICKABLE` added (a plain `lv_label_create()` isn't clickable by
+     default, so it wasn't eligible for ANY press event before this) — no visual
+     change to the label itself, matching the task's explicit "never a visible
+     button."
+  10. **`FIRMWARE_VERSION` is a hand-maintained `-D` build flag
+      (`platformio.ini`), not git-describe-injected.** This project has no tagged
+      release process to hook a version string to yet — a build-time constant
+      that gets bumped by hand is the honest, proportionate choice today; revisit
+      if/when real releases start getting tagged.
+  11. **Flash/RAM report** (real `pio run` size output, after the DRAM-overflow fix
+      in point 12 below): `bringup-judging` links at 1,247,445B flash (39.7% of
+      `app0` — up only ~13,000B from F5's 1,234,117B, confirming this task's real
+      cost was the RAM design mistake below, not code size) and 115,944B static
+      RAM (35.4% — up from F5's 107,600B, an increase that's now entirely
+      legitimate small state: `diag::log()`'s ring buffer, `camera::lastError()`'s
+      buffer, the `Attempt` structs in both new network modules — not the
+      hundreds-of-KB mistake point 12 describes and fixes). `handheld` (still not
+      calling into any of this) is 461,313B flash, 25,736B RAM — both barely above
+      F5's numbers, confirming tree-shaking still holds.
+  12. **Real bug found and fixed during this task's own build verification: a
+      link-time DRAM overflow from oversized `static` arrays, not caught until
+      `pio run` actually failed.** The first draft of `storage::photo_state.cpp`
+      declared FOUR separate `static PhotoRecord buf[1024]` arrays (one each in
+      `countPhotos()`, `countUntransferred()`, `allTransferred()`,
+      `clearAllPhotos()` — each ~48KB, ~196KB total, never shared), plus
+      `photo_transfer_screen.cpp` and `network/photo_upload.cpp` each had their
+      own separate `static`/module-global 500-entry array (~24KB each) — all
+      permanently reserved in the `.bss`/DRAM segment whether or not a card was
+      even present, on a chip with only 320KB of SRAM total. `bringup-judging`
+      failed to LINK (`region 'dram0_0_seg' overflowed by 69264 bytes`) —
+      confirming this the hard way rather than catching it by inspection. Fixed
+      two ways: (1) `photo_state.cpp` gained an internal `scanPhotos()` that
+      walks the SD directory ONCE and can report accurate total/untransferred
+      counts with `out=nullptr` — so `countPhotos()`/`countUntransferred()`/
+      `allTransferred()` need NO array at all anymore, matching
+      `storage::vehicle_db`'s own bounded-but-honest-count shape
+      (`findMakes()`'s `maxOut` vs. its returned true total); (2) every place
+      that genuinely needs a real array (`clearAllPhotos()`,
+      `photo_transfer_screen.cpp`'s listing, `photo_upload.cpp`'s batch) now
+      heap-allocates (`new`/`delete[]`) sized to the ACTUAL count, never a fixed
+      worst-case-sized static reservation. General lesson for any future firmware
+      module holding a list that could run into the hundreds: heap-allocate sized
+      to real need, never `static`/global-array a hundreds-of-entries struct —
+      `.bss` is a fixed, tiny, always-paid budget; heap is paid only when used.
+  13. **Physical verification limits — same caveat as every prior firmware task.**
+      Nothing here ran on real hardware; no camera, no board, no live Home Base
+      to upload photos to, available in this environment. `firmware/TESTING.md`'s
+      new F6 section lists six specific real-hardware checks (safe removal
+      leaving nothing open, WiFi transfer actually resuming rather than
+      restarting, Clear Photos' refusal gate, the full judging flow with no
+      camera physically attached, the long-press-only reveal gesture, and real
+      720p upload timing for a realistic batch) — every one of them is currently
+      unverified beyond "compiles and traces correctly against the task spec,"
+      the same ceiling every prior firmware task has had.
+
 ## Open
 
+- **No mains/USB-power-detect signal exists on this board (F6).** Same class of
+  gap as the battery ADC pin immediately below — no charge-status/VBUS-sense pin
+  is documented anywhere in Elecrow's materials or either reference example repo,
+  and none is guessed here. Blocks: a real "warn if not plugged into power"
+  check on the WiFi photo-transfer screen, which currently shows a plain
+  informational note instead (see F6's point 5). If a pin is ever confirmed, add
+  it to `pins.h` the same way `PIN_BATTERY_ADC` is documented to be added below.
 - **`camera::CAPTURE_MODE_PHOTO` (1280x720) is unverified against real hardware.** F3
   picked `CAM_IMAGE_MODE_HD` for the judging flow's two required photos, but the only
   resolution ever exercised on real hardware was the bring-up test's QVGA (320x240) —

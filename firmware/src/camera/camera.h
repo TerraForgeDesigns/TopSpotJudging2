@@ -54,6 +54,15 @@ bool waitReady(uint32_t timeoutMs);
 CameraState getState();
 bool isReady();
 
+// The message from the most recent failure this module has seen — init
+// failure/timeout (begin()/waitReady()) or a capture failure
+// (captureToFile()) — persisted (unlike CaptureResult::error, which is
+// only ever returned once from the call that produced it) so the
+// diagnostics screen can show "camera status and last error" (see
+// ui/screens/diagnostics_screen.h) after the fact, not just at the
+// moment of failure. "" if nothing has failed yet since boot.
+const char* lastError();
+
 struct CaptureResult {
     bool success;
     uint32_t bytesWritten;

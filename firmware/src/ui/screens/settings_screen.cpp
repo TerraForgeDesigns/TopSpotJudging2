@@ -12,6 +12,8 @@
 #include "../components/text_keyboard.h"
 #include "../fonts/fonts.h"
 #include "../theme.h"
+#include "diagnostics_screen.h"
+#include "photo_transfer_screen.h"
 #include "storage/settings.h"
 
 namespace ui::screens {
@@ -88,6 +90,13 @@ void onEditSyncInterval(void* /*ctx*/) {
                                       "Enter 1 to 15 minutes.", onSyncIntervalSaved, nullptr);
 }
 
+void onManagePhotos(void* /*ctx*/) { screen_manager::push(PhotoTransferScreen::create); }
+
+// F6's deliberate-gesture reveal for Diagnostics — never a visible
+// button (see diagnostics_screen.h). Attached to the plain hint label
+// below with no visual change to it at all.
+void onHintLongPressed(lv_event_t*) { screen_manager::push(DiagnosticsScreen::create); }
+
 void onThemeDark(lv_event_t*) {
     g_settings.theme = storage::ThemeChoice::Dark;
     storage::saveSettings(g_settings);
@@ -131,6 +140,7 @@ void SettingsScreen::build(lv_obj_t* content) {
     snprintf(intervalBuf, sizeof(intervalBuf), "%d minutes", g_settings.syncIntervalSeconds / 60);
     components::listRow(content, "Update Check Interval", intervalBuf, components::RowDot::None, onEditSyncInterval,
                          nullptr);
+    components::listRow(content, "Manage Photos", nullptr, components::RowDot::None, onManagePhotos, nullptr);
 
     lv_obj_t* themeLabel = lv_label_create(content);
     lv_obj_add_style(themeLabel, theme::textSecondary(), 0);
@@ -158,6 +168,11 @@ void SettingsScreen::build(lv_obj_t* content) {
                        "These can also be edited by taking the memory card out and opening "
                        "settings.txt in any text editor - useful if a setting is wrong and this "
                        "screen isn't reachable.");
+    // Diagnostics' only reveal — a long-press here, nothing visible marks
+    // it. lv_label_create() isn't clickable by default; CLICKABLE is what
+    // makes it eligible for LV_EVENT_LONG_PRESSED at all.
+    lv_obj_add_flag(hint, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(hint, onHintLongPressed, LV_EVENT_LONG_PRESSED, nullptr);
 }
 
 Screen* SettingsScreen::create(void* /*arg*/) { return new SettingsScreen(); }

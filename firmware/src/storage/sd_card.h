@@ -29,6 +29,18 @@ struct SdInfo {
 // a judging record can be considered complete.
 bool begin();
 
+// Cleanly releases the SD peripheral (SD.end()) — this library's own
+// "no held state, safe to physically remove the card" primitive. Every
+// write this firmware makes is already open-write-close-verify per call
+// (see writeFileAtomic()'s own header comment), so there's no separate
+// buffered-write flush needed beyond this. Used by the Transfer Photos
+// screen before showing "Safe to remove the memory card." — see
+// ui/screens/photo_transfer_screen.h. Every storage:: call already
+// degrades safely (returns false/empty) while unmounted, the same way it
+// already does if a card is missing entirely — no other module needs to
+// change to respect this. Call begin() again to remount.
+void unmount();
+
 bool isMounted();
 
 // Re-reads capacity/free-space; call after begin() and after any write

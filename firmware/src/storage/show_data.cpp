@@ -238,4 +238,17 @@ bool mergeEntries(const Entry* delta, int deltaCount) {
     return ok;
 }
 
+int countEntries() {
+    size_t len = 0;
+    uint8_t* buf = readWholeFile(ENTRIES_PATH, MAX_ENTRIES_FILE_SIZE, &len);
+    if (buf == nullptr) return 0;
+
+    DynamicJsonDocument doc(len * 3 + 1024);
+    DeserializationError err = deserializeJson(doc, buf, len);
+    free(buf);
+    if (err) return 0;
+
+    return doc.as<JsonArrayConst>().size();
+}
+
 }  // namespace storage

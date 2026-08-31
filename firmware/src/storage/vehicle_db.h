@@ -49,6 +49,11 @@ void init();
 // must work either way).
 bool seedAvailable();
 
+// The seed binary's own header facts — for the diagnostics screen's
+// "vehicle data version" (ui/screens/diagnostics_screen.h). Returns
+// false (outputs left untouched) when seedAvailable() is false.
+bool getSeedInfo(uint16_t* version, uint32_t* makeCount, uint32_t* modelCount);
+
 // Bounded, case-insensitive SUBSTRING match (matches anywhere in the
 // name, not just a prefix — "vette" finds "Corvette") across every make
 // name, seed + learned merged and de-duplicated case-insensitively.
