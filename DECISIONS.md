@@ -1662,6 +1662,52 @@ building on top of it. Newest entries at the top of each section.
   9. **Full suite result:** `pytest tests/ -q` → 218 passed (the pre-existing
      suite plus every INT1 addition), 0 failures, 0 skips.
 
+- **INT2 — Router setup (`docs/router-setup.md`): a real bug found and fixed —
+  the handheld firmware's compiled-in Home Base address pointed at the ROUTER,
+  not at Home Base.** `firmware/src/storage/settings.h`'s `homeBaseAddress`
+  default was `"192.168.8.1:8000"`, and its own comment said plainly what that
+  is: "the GL.iNet router's default LAN gateway." But Home Base runs on a
+  separate Windows laptop (CONTEXT.md's hardware list), not on the router — the
+  router doesn't serve `/api/v1/sync` on port 8000 or anything else. Confirmed
+  by grepping all of `firmware/src/` and `firmware/include/` for any other
+  `192.168.*` reference: this was the ONLY one, so there was nothing else
+  depending on the old value to break.
+  1. **Fix: the default is now `192.168.8.2:8000`**, paired with a real,
+     documented procedure (`docs/router-setup.md` section 3) for reserving that
+     exact address to the Home Base laptop via the GL-SFT1200's DHCP reservation
+     — keyed on the laptop's Wi-Fi MAC address, not its dynamically-assigned
+     one, so it survives reboots and reconnects. `.2` was chosen deliberately
+     low (GL.iNet's stock DHCP pool commonly starts around `.100`) so it can
+     never collide with a dynamically-assigned client — the doc tells the host
+     to confirm this on their specific unit before saving, rather than asserting
+     it as a universal fact about every GL-SFT1200 firmware version.
+  2. **Net effect: a freshly-flashed handheld now needs zero on-device
+     configuration to find Home Base**, as long as the DHCP reservation from
+     router-setup.md is in place — only **Show Wi-Fi Name**/**Show Wi-Fi
+     Password** need entering per show. Before this fix, EVERY handheld would
+     have silently pointed at the router's own web UI (port 8000 unused there)
+     and shown **Not Connected** all day unless someone happened to notice and
+     hand-corrected the Home Base Address field on every single device — exactly
+     the kind of silent, hard-to-diagnose field failure CONTEXT.md's resilience
+     principle exists to prevent.
+  3. **`docs/show-day-runbook.md` updated to match** — its "Starting Home Base"
+     and "Preparing and checking handhelds" sections previously told the host to
+     hunt down the laptop's dynamic IP with `ipconfig` and hand-update every
+     handheld to match. That's now backwards: with the reservation in place the
+     address is always `192.168.8.2`, so those steps became "confirm it's what
+     you expect," not "go find it and propagate it by hand." `README.md`'s
+     "Running the system" section (previously a stale placeholder — "This
+     section will grow... right now this repo is structure and specification
+     only," no longer true) now points at both docs instead of repeating them.
+  4. **What's still real router-specific advice, not verified against physical
+     hardware**: the exact GL.iNet admin-UI navigation (menu labels/paths across
+     firmware versions), the stock DHCP pool range, and Bluetooth/VPN feature
+     presence are described as "confirm on this specific unit" rather than
+     asserted as fixed facts — this environment has no physical GL-SFT1200 to
+     test against, so router-setup.md is written to be correct in structure and
+     values while flagging the parts that need a real unit in hand to confirm,
+     the same honesty standard every hardware-adjacent doc in this project uses.
+
 ## Open
 
 - **The vendored web fonts are placeholders, not the real distinct weights (INT1).**

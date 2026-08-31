@@ -20,7 +20,12 @@ struct Settings {
     char judgeName[64] = "";
     char wifiSsid[32] = "";
     char wifiPassword[64] = "";
-    char homeBaseAddress[64] = "192.168.8.1:8000";  // the GL.iNet router's default LAN gateway
+    // 192.168.8.2 — NOT the router's own gateway (192.168.8.1). This is the
+    // fixed DHCP reservation docs/router-setup.md has the router hand out to
+    // the Home Base laptop every time, so a freshly-flashed handheld reaches
+    // Home Base with zero on-device configuration as long as that
+    // reservation is in place. See that doc before changing this value.
+    char homeBaseAddress[64] = "192.168.8.2:8000";
     ThemeChoice theme = ThemeChoice::Dark;
     // The BASE interval network::sync's periodic trigger checks at when
     // out of range — PROTOCOL.md: "default 3 minutes, configurable," and

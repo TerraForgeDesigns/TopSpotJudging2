@@ -52,18 +52,21 @@ work around it.
 
 ## Running the system (event day)
 
-1. Power on the GL.iNet GL-SFT1200 router. It creates the isolated show WiFi network
-   — no internet uplink needed or expected.
-2. Start home base on the Windows laptop, connected to the router.
-3. Power on each handheld. Each one is provisioned with the router's SSID and the
-   home base's LAN IP ahead of time.
-4. Judges score cars through the day; handhelds sync scores opportunistically per the
-   trigger model in PROTOCOL.md.
-5. After judging closes, take each handheld's microSD card out and put it in the
-   laptop (preferred) to transfer photos, or fall back to WiFi upload if the card
-   can't be read directly.
-6. Use home base to resolve any flagged conflicts, compute results, and run the
-   awards presentation.
+Full, concrete instructions live in two docs written for whoever is actually
+running the show, not necessarily whoever built it:
 
-*(This section will grow with concrete commands once `/homebase` and `/firmware` have
-actual code in them — right now this repo is structure and specification only.)*
+- [docs/router-setup.md](docs/router-setup.md) — one-time GL.iNet GL-SFT1200
+  setup: the show Wi-Fi network, the fixed DHCP reservation that lets every
+  handheld find Home Base with zero manual configuration, what to turn off, field
+  placement, and recovery if the router loses power mid-show.
+- [docs/show-day-runbook.md](docs/show-day-runbook.md) — the full day-of sequence
+  (starting Home Base, checking handhelds) and troubleshooting for the failures
+  that actually happen at a show: a handheld that won't connect, photos that won't
+  import, a car judged twice, a wrong entry number, a handheld that died with work
+  unsent, a vehicle the built-in list doesn't know.
+
+The short version: power on the router, start Home Base on the laptop
+(`.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`), power
+on each handheld and confirm it reads **Up to Date**, judge the show, then pull
+photos off each handheld's microSD card (or fall back to Wi-Fi upload) and use
+Home Base to resolve conflicts, compute results, and run the awards presentation.

@@ -19,11 +19,15 @@ goes wrong** and find the matching heading.
 
 ## 2. Setting up the router
 
+Full instructions — creating the show Wi-Fi network, reserving Home Base's fixed
+address, and what to turn off — live in
+[router-setup.md](router-setup.md). Do that once, ahead of time (it only needs
+redoing if you swap in a different, unconfigured router unit). On the day itself:
+
 1. Power on the GL.iNet GL-SFT1200. Give it a minute to boot.
-2. The show WiFi network name (SSID) and password are printed on a sticker on the
-   underside of the router, unless they were changed during setup — if they were
-   changed, write the real ones on a card and keep it with the laptop. Every
-   handheld and the laptop connect to this SAME network.
+2. The show Wi-Fi network name (SSID) and password are whatever was set during
+   router setup — written on a card kept with the laptop, not the router's factory
+   default. Every handheld and the laptop connect to this SAME network.
 3. This router is **not** connected to the internet, and that's correct — it only
    creates a local network between the laptop and the handhelds. Don't waste time
    trying to get it "online."
@@ -43,20 +47,21 @@ goes wrong** and find the matching heading.
 3. On the laptop's own browser, go to `http://localhost:8000/` and confirm the
    right show is showing at the top of the sidebar (its name, not "Switch show").
    If it's the wrong show, click **Switch show** and pick the right one.
-4. Find the laptop's WiFi IP address (Windows: `ipconfig`, look for the address on
-   the router's network — usually starts with the router's own address, e.g.
-   `192.168.8.x`). Handhelds are provisioned to look for `192.168.8.1:8000` by
-   default (the GL-SFT1200's own gateway address) — if the laptop's IP is
-   different, every handheld's **Home Base Address** setting needs updating (see
-   below).
+4. As long as [router-setup.md](router-setup.md)'s DHCP reservation is in place,
+   the laptop always gets `192.168.8.2` on the show network — there's nothing to
+   look up here. If `ipconfig` shows something else, the reservation either isn't
+   set up yet or didn't take; fix it in the router's admin page before continuing
+   (a handheld can't find Home Base at the wrong address).
 
 ## 4. Preparing and checking handhelds
 
 For each handheld, before judges start walking the field:
 
 1. Power it on. On its **Settings** screen, confirm **Show Wi-Fi Name** and
-   **Show Wi-Fi Password** match the router, and **Home Base Address** matches
-   what you found in step 3.4 above (`<laptop-ip>:8000`).
+   **Show Wi-Fi Password** match the router. Leave **Home Base Address** at its
+   default (`192.168.8.2:8000`) — it should already match, since that's exactly
+   the fixed address [router-setup.md](router-setup.md) reserves. Only change it
+   if step 3.4 above showed the laptop landed on a different address.
 2. Wait for the status bar to show **Up to Date** (green) — that's a real,
    successful connection to Home Base, not just to the WiFi network.
 3. On the laptop, open the **Handhelds** page and confirm this device appears and
