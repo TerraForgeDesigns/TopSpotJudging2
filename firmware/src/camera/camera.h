@@ -54,6 +54,14 @@ bool waitReady(uint32_t timeoutMs);
 CameraState getState();
 bool isReady();
 
+// The GPIO this build is actually using for Camera CS (PIN_CAMERA_CS from
+// pins.h) — logged to the serial console at begin() and shown on the
+// diagnostics screen, so a mis-set CS pin (e.g. the PRE-SOLDER GATE
+// fallback in pins.h chosen or not chosen correctly) is visible as "wrong
+// pin" rather than presenting as a dead/unresponsive camera. See
+// pins.h's PRE-SOLDER GATE block.
+int csPin();
+
 // The message from the most recent failure this module has seen — init
 // failure/timeout (begin()/waitReady()) or a capture failure
 // (captureToFile()) — persisted (unlike CaptureResult::error, which is

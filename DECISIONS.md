@@ -421,7 +421,10 @@ building on top of it. Newest entries at the top of each section.
   ESP32 Display 7" (DIS08070H V3.0), ESP32-S3-WROOM-1-N4R8, 800x480 RGB parallel LCD
   (not SPI TFT), GT911 capacitive touch over I2C, onboard microSD, Arducam Mega 5MP
   SPI on a second dedicated SPI bus using repurposed UART0 (GPIO43/44) and I2S BCLK
-  (GPIO42) pins, plus GPIO38 for camera CS. Full pin table with sourcing lives in
+  (GPIO42) pins, plus GPIO38 for camera CS. **The UART0 (GPIO43/44) part of this was
+  corrected before any soldering — see the camera pin correction entry, later in this
+  log — camera MOSI/MISO now live on GPIO17/18 instead; `pins.h` is the current source
+  of truth, not this historical entry.** Full pin table with sourcing lives in
   `firmware/include/pins.h` — every pin was verified against Elecrow's own wiki and
   two independent working example sketches from the community reference repo Elecrow
   points users to for this board, not guessed. This resolves the "exact touchscreen
@@ -1708,6 +1711,59 @@ building on top of it. Newest entries at the top of each section.
      values while flagging the parts that need a real unit in hand to confirm,
      the same honesty standard every hardware-adjacent doc in this project uses.
 
+- **Camera pin correction (pre-solder): moved off UART0 (GPIO43/44) onto the
+  I2S pins at U11 (GPIO17/18/42) instead — reversing the F1 hardware
+  contract's original choice before any board is actually soldered.** The
+  original design (F1, "Handheld hardware contract locked in," above) put
+  Camera MOSI/MISO on GPIO43/44 (UART0) and accepted, as a stated trade-off,
+  that soldering the camera on would permanently kill the board's only
+  serial console and programming path (no native-USB fallback exists — see
+  `platformio.ini`). That trade-off was filed as "not a blocker" on the
+  reasoning that firmware iteration happens over UART0 before the camera's
+  permanent installation.
+  1. **That reasoning holds for exactly one build and fails for the actual
+     product.** This is 3–4 physical handhelds, each reflashed repeatedly
+     across the life of the system — not a single prototype flashed once and
+     then left alone. Under the original design, every future firmware
+     update to a camera-equipped handheld would need the camera physically
+     desoldered first, and the serial console — the tool actually needed to
+     diagnose a bug a handheld hits out in a field — would be permanently
+     gone by then, not just temporarily inconvenient during bring-up.
+  2. **The fix costs nothing new**: GPIO17/18 were already unused —
+     `pins.h`'s own I2S reminder block already listed them as free, unused
+     SDIN/LRCLK pins nobody was touching — and they sit at the SAME
+     amplifier (U11) GPIO42 (BCLK) was already being tapped from for Camera
+     SCK. So this is three solder points at one chip (U11: BCLK/LRCLK/SDIN →
+     SCK/MISO/MOSI) instead of two there plus a separate connector (the old
+     UART0/CH340 bridge pins) — simpler wiring, not more complex, while
+     fixing the actual problem. `PIN_CAMERA_CS` (GPIO38, on the board's
+     "GPIO_D" connector) is unchanged — it was never on UART0 in the first
+     place, only MOSI/MISO were.
+  3. **GPIO43/44 are now explicitly reserved** (`PIN_UART0_TX`/
+     `PIN_UART0_RX` in `pins.h`, grep-able so nothing accidentally claims
+     them again) rather than just implicitly free. `platformio.ini`'s
+     comment about losing the programming path once the camera is soldered
+     no longer applies and has been rewritten to say why it doesn't.
+  4. **The old "not a blocker" Open entry is struck, not deleted** — see
+     below — per this file's own convention for a reversed decision: the
+     history of *why* the original call was made, and why it turned out to
+     be wrong, survives rather than getting silently erased.
+  5. **Nothing else moved.** `PIN_CAMERA_SCK` (GPIO42) and `PIN_CAMERA_CS`
+     (GPIO38) are unchanged from F1. The GPIO38/Touch-INT uncertainty (below)
+     is untouched by this correction — it's a separate, still-open question
+     about a different pin, not resolved or affected by moving MOSI/MISO.
+     `PIN_BATTERY_ADC` remains blocked on the fuel-gauge decision, also
+     untouched.
+  6. **Real build verification**: all seven PlatformIO environments
+     (`bringup-display`, `bringup-sd`, `bringup-camera`, `bringup-ui`,
+     `bringup-storage`, `bringup-judging`, `handheld`) build successfully
+     against the corrected `pins.h` — `pio run` for each, not just a read of
+     the diff. `bringup-camera` and `handheld` (the two that actually
+     reference `PIN_CAMERA_*`/`camera::csPin()`) both link and produce a
+     valid image; RAM/flash usage is essentially unchanged from before this
+     correction (a pin renumbering, not new logic beyond the CS-pin log
+     line and diagnostics fact row).
+
 ## Open
 
 - **The vendored web fonts are placeholders, not the real distinct weights (INT1).**
@@ -1798,22 +1854,39 @@ building on top of it. Newest entries at the top of each section.
   charge to a safe 2.1V at the ADC pin). `firmware/src/power/battery.h` deliberately
   fails to compile (`#error`) until `PIN_BATTERY_ADC` is added to `pins.h` — see that
   file. Blocks: battery bring-up test, `src/power/` sleep management.
-- **GPIO38 possibly double-claimed — needs a continuity check before soldering.** One
-  secondary source (an ESPHome community PR for this board) lists GPIO38 as "Touch
-  INT," which would conflict with its assignment as Camera CS. The verified *working*
-  reference example initializes GT911 touch with `INT=-1` (unused, pure I2C polling)
-  successfully, so firmware proceeds on the assumption GPIO38 is genuinely free — but
-  this wasn't independently confirmed against a schematic. A 30-second multimeter
-  continuity check between the GT911's INT pad and GPIO38 before soldering the camera
-  on would close this out for good.
-- **Once the Arducam is soldered onto GPIO43/44, this board loses its normal
-  USB-serial programming path** (UART0 via the CrowPanel's onboard bridge chip, which
-  is exactly what's being repurposed). Not a blocker — firmware bring-up and
-  iteration happens over UART0 before the camera's permanent installation, matching
-  the project's own "eventually solder directly" plan — but worth remembering before
-  reflashing becomes much less convenient. No native-USB fallback: GPIO19/20 (the
-  ESP32-S3's fixed native USB pins) are permanently wired to GT911 touch I2C on this
-  board.
+- **PRE-SOLDER GATE — GPIO38 possibly double-claimed (Camera CS vs. Touch INT).**
+  One secondary source (an ESPHome community PR for this board) lists GPIO38 as
+  "Touch INT," which would conflict with its assignment as Camera CS. The
+  verified *working* reference example initializes GT911 touch with `INT=-1`
+  (unused, pure I2C polling) successfully, so firmware proceeds on the
+  assumption GPIO38 is genuinely free — but this wasn't independently confirmed
+  against a schematic. **Exact measurement required before soldering the camera
+  CS wire**: multimeter continuity check, GT911 INT pad → GPIO38 (board
+  powered OFF). No continuity → GPIO38 is free, solder as documented, nothing
+  to change. Continuity found → GPIO38 is Touch INT; change `PIN_CAMERA_CS` in
+  `pins.h` to the ALTERNATE CS CANDIDATE already written there (GPIO44) — a
+  one-line edit, already staged as a commented-out line for exactly this case.
+  Full procedure, plus the companion U11-pad continuity check for
+  MOSI/MISO/SCK, is in `firmware/TESTING.md`'s new Pre-Solder Checklist —
+  written to be the document actually in hand when soldering, not just this
+  log entry. Also mitigated in code regardless of which way this resolves:
+  `camera::csPin()` logs the CS pin actually in use to the serial console at
+  every boot and shows it on the Diagnostics screen, so a mis-set pin (this
+  question answered wrong, or a future edit that doesn't match the physical
+  board) shows up as "wrong pin," not a mysteriously dead camera.
+- ~~Once the Arducam is soldered onto GPIO43/44, this board loses its normal
+  USB-serial programming path. Not a blocker — firmware bring-up and iteration
+  happens over UART0 before the camera's permanent installation, matching the
+  project's own "eventually solder directly" plan — but worth remembering
+  before reflashing becomes much less convenient.~~ **REVERSED before any
+  soldering happened** — see the Decided entry on the camera pin correction,
+  above. This reasoning held for exactly one build's bring-up phase and failed
+  for the actual product: 3–4 handhelds, each reflashed repeatedly across the
+  life of the system, would each need the camera desoldered for every firmware
+  update, and the serial console is exactly what's needed to diagnose a field
+  bug — which is precisely when it would have been gone. The camera moved off
+  UART0 entirely (GPIO17/18/42 instead — see `pins.h`) rather than accept this
+  trade-off as permanent.
 
 ## Notes for future sessions
 

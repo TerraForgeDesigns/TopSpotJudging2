@@ -5,6 +5,71 @@ hardware behavior, and crash safety under an actual power loss. See each
 bring-up file's own header comment for what to check on that specific
 target; this file is the shared procedure they point back to.
 
+## Pre-Solder Checklist
+
+Two multimeter continuity checks, done once per board, before any camera wire is
+soldered on. Power the board off for both (continuity mode reads garbage, or can
+damage the meter/board, on a powered circuit). Read pins.h's own comments on the
+Arducam Mega section and the PRE-SOLDER GATE block alongside this — they're the
+same information, this is the physical procedure for it.
+
+### Check 1 — GT911 INT pad to GPIO38 (resolves Camera CS vs. Touch INT)
+
+**What this settles**: whether GPIO38 is genuinely free for Camera CS, or whether
+it's actually wired to the touch controller's interrupt line, per one secondary
+source that disagrees with the verified working reference firmware. This is a
+real open question, not a formality — see DECISIONS.md's Open section.
+
+1. One probe on the GT911's INT pad (on the touch controller or its breakout, not
+   a display pin — confirm you have the right pad before probing anything else).
+2. Other probe on GPIO38 (the board's "GPIO_D" connector, per pins.h).
+3. Read the result:
+
+   | Meter shows | Means | Pin assignment |
+   |---|---|---|
+   | **No continuity** (open circuit) | GPIO38 is genuinely unused by touch — the verified reference firmware's assumption holds. | Camera CS = GPIO38, exactly as `pins.h` has it today. Solder as documented, no changes. |
+   | **Continuity** (closed circuit / low resistance, typically near 0Ω) | GPIO38 really is GT911 Touch INT — the secondary source was right. Camera CS cannot use this pin. | Change `PIN_CAMERA_CS` in `pins.h` to the ALTERNATE CS CANDIDATE already written there (GPIO44) — that's a one-line edit, already commented in place. Re-read that block's note: GPIO44 is the last free GPIO on this module, and using it for CS means the serial console (UART0) is lost again, on purpose this time, not by accident. |
+
+### Check 2 — U11's BCLK / LRCLK / SDIN pads to GPIO42 / 18 / 17 (confirms the camera SPI wiring plan before committing solder)
+
+**What this settles**: that the three pads you're about to solder camera SCK/
+MISO/MOSI wires to are actually the GPIOs `pins.h` says they are — a wrong
+assumption here doesn't get caught until the camera is soldered and doesn't
+work, at which point it looks identical to a dead camera (see the CS-pin
+diagnostics logging note below for why that ambiguity matters). This is
+due-diligence on the wiring plan, not an open question the way Check 1 is —
+there's no conflicting source for these three, just confirm before you commit.
+
+For EACH of the three pads on U11 (the audio amplifier being tapped), probe from
+that pad to its expected GPIO test point on the module:
+
+| U11 pad | Expected GPIO | Becomes |
+|---|---|---|
+| BCLK | GPIO42 | `PIN_CAMERA_SCK` |
+| LRCLK | GPIO18 | `PIN_CAMERA_MISO` |
+| SDIN | GPIO17 | `PIN_CAMERA_MOSI` |
+
+- **Continuity on all three, matched as above**: the wiring plan is confirmed.
+  Solder camera SCK/MISO/MOSI to BCLK/LRCLK/SDIN respectively, exactly as
+  `pins.h` documents.
+- **No continuity on a pad you expected one on, or continuity to a DIFFERENT
+  GPIO than listed**: stop before soldering that connection. Either the pad was
+  misidentified (double-check against U11's actual pinout/silkscreen, not
+  memory) or this specific board revision differs from the one `pins.h`'s
+  sourcing was verified against — in either case, update `pins.h` with the
+  corrected pin and note the correction in DECISIONS.md before proceeding, the
+  same way this document's own camera pin correction was handled.
+
+### After both checks pass
+
+Camera CS pin in use is also logged automatically at every boot — to the serial
+console (`[camera] CS pin: GPIO38` or whichever it resolves to) and on the
+Diagnostics screen's CAMERA card (long-press to reach it) — specifically so a
+mis-set CS pin shows up as "wrong pin" the first time the board boots with the
+camera attached, not as a mysterious dead camera days later. Confirm that logged
+number matches what you actually soldered before considering the camera install
+done.
+
 ## The battery-pull procedure
 
 Why this exists: CONTEXT.md's resilience principle is "a judge losing an

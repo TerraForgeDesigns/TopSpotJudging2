@@ -61,6 +61,10 @@ void DiagnosticsScreen::build(lv_obj_t* content) {
     sectionLabel(content, "CAMERA");
     lv_obj_t* cameraCard = components::card(content);
     fact(cameraCard, "Status", cameraStateName(camera::getState()));
+    // Visible here too, not just the serial log — see pins.h's PRE-SOLDER
+    // GATE block: a mis-set CS pin must be checkable without a laptop
+    // plugged in, since this screen is reachable in the field.
+    factInt(cameraCard, "CS pin (GPIO)", camera::csPin());
     fact(cameraCard, "Last error", camera::lastError()[0] != '\0' ? camera::lastError() : "None");
 
     // --- SD card ---

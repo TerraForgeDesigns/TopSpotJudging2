@@ -141,6 +141,12 @@ void captureTask(void* pv) {
 
 void begin() {
     if (g_state == CameraState::READY || g_state == CameraState::INITIALIZING) return;
+    // Logged here, on the caller's thread, BEFORE the init task starts —
+    // diag::log() is not safe to call from a background task (no mutex;
+    // see diag/log.h), and this is exactly the fact a mis-set CS pin
+    // (see pins.h's PRE-SOLDER GATE) needs visible from the very first
+    // boot, not just after a capture already looks like a dead camera.
+    diag::log("[camera] CS pin: GPIO%d", PIN_CAMERA_CS);
     g_state = CameraState::INITIALIZING;
     xTaskCreatePinnedToCore(initTask, "cam_init", 4096, nullptr, 1, nullptr, 1);
 }
@@ -163,6 +169,7 @@ bool waitReady(uint32_t timeoutMs) {
 
 CameraState getState() { return g_state; }
 bool isReady() { return g_state == CameraState::READY; }
+int csPin() { return PIN_CAMERA_CS; }
 
 CaptureResult captureToFile(const char* path, int mode, uint32_t timeoutMs) {
     if (g_state != CameraState::READY) {
