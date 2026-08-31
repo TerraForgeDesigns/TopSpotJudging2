@@ -1,19 +1,45 @@
 #include "vehicle_details_screen.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "../components/alert_banner.h"
 #include "../components/button.h"
 #include "../components/list_row.h"
+#include "../components/numeric_keypad_overlay.h"
 #include "../components/text_keyboard.h"
 #include "../judging_session.h"
 #include "judge_car_screen.h"
+#include "make_selector_screen.h"
+#include "model_selector_screen.h"
+#include "storage/show_data.h"
 
 namespace ui::screens {
 
 namespace {
 
-enum class Field { Participant, Year, Make, Model, VehicleType };
+// 1885: the first automobile — a fixed floor, not clock-dependent. Upper
+// bound is the SHOW's own known event year + 1 (one model year ahead,
+// same allowance a real dealer/DMV form gives) — see
+// storage::ShowInfo::eventYear and DECISIONS.md's F4 entry. This is data
+// Home Base already pushed down, not a live clock reading, so no RTC/
+// NTP/network is needed at judging time — only that a sync already
+// happened once. Pre-first-sync (eventYear == 0), fall back to a wide
+// default rather than rejecting all input.
+constexpr int MIN_VEHICLE_YEAR = 1885;
+constexpr int FALLBACK_MAX_VEHICLE_YEAR = 2035;
+
+bool isValidYear(const char* text) {
+    if (strlen(text) != 4) return false;
+    int year = atoi(text);
+    storage::ShowInfo show;
+    storage::loadShowInfo(&show);
+    int maxYear = show.eventYear > 0 ? show.eventYear + 1 : FALLBACK_MAX_VEHICLE_YEAR;
+    return year >= MIN_VEHICLE_YEAR && year <= maxYear;
+}
+
+enum class Field { Participant, VehicleType };
 
 void onFieldSaved(void* ctx, const char* text, bool accepted) {
     if (!accepted) return;
@@ -22,35 +48,35 @@ void onFieldSaved(void* ctx, const char* text, bool accepted) {
 
     switch (field) {
         case Field::Participant: strncpy(car.participant, text, sizeof(car.participant) - 1); break;
-        case Field::Year: strncpy(car.year, text, sizeof(car.year) - 1); break;
-        case Field::Make:
-            strncpy(car.make, text, sizeof(car.make) - 1);
-            car.makeManuallyEntered = true;  // free text, not picked from an approved list — see PROTOCOL.md
-            break;
-        case Field::Model:
-            strncpy(car.model, text, sizeof(car.model) - 1);
-            car.modelManuallyEntered = true;
-            break;
         case Field::VehicleType: strncpy(car.vehicleType, text, sizeof(car.vehicleType) - 1); break;
     }
     judging::save();
     screen_manager::refresh();
 }
 
-void editField(Field field, const char* currentValue, const char* placeholder, bool numeric) {
+void editField(Field field, const char* currentValue, const char* placeholder) {
     auto ctx = reinterpret_cast<void*>(static_cast<intptr_t>(field));
-    if (numeric) {
-        components::numericKeyboardOverlay(currentValue, placeholder, 8, onFieldSaved, ctx);
-    } else {
-        components::textKeyboardOverlay(currentValue, placeholder, 79, onFieldSaved, ctx);
-    }
+    components::textKeyboardOverlay(currentValue, placeholder, 79, onFieldSaved, ctx);
 }
 
-void onEditParticipant(void* ctx) { editField(Field::Participant, static_cast<const char*>(ctx), "Participant", false); }
-void onEditYear(void* ctx) { editField(Field::Year, static_cast<const char*>(ctx), "Year", true); }
-void onEditMake(void* ctx) { editField(Field::Make, static_cast<const char*>(ctx), "Make", false); }
-void onEditModel(void* ctx) { editField(Field::Model, static_cast<const char*>(ctx), "Model", false); }
-void onEditVehicleType(void* ctx) { editField(Field::VehicleType, static_cast<const char*>(ctx), "Vehicle Type", false); }
+void onEditParticipant(void* ctx) { editField(Field::Participant, static_cast<const char*>(ctx), "Participant"); }
+void onEditVehicleType(void* ctx) { editField(Field::VehicleType, static_cast<const char*>(ctx), "Vehicle Type"); }
+
+void onYearSaved(void* /*ctx*/, const char* text, bool accepted) {
+    if (!accepted) return;
+    strncpy(judging::current().year, text, sizeof(judging::current().year) - 1);
+    judging::save();
+    screen_manager::refresh();
+}
+
+void onEditYear(void* ctx) {
+    components::numericKeypadOverlay(static_cast<const char*>(ctx), "Year", /*maxLen=*/4, /*autoAcceptLen=*/4,
+                                      isValidYear, "Not a plausible year for this show. Check the digits.", onYearSaved,
+                                      nullptr);
+}
+
+void onEditMake(void* /*ctx*/) { screen_manager::push(MakeSelectorScreen::create); }
+void onEditModel(void* /*ctx*/) { screen_manager::push(ModelSelectorScreen::create); }
 
 void onContinue(lv_event_t*) {
     judging::current().furthestStep = storage::DraftStep::Judging;

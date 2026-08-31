@@ -53,7 +53,9 @@ void setup() {
 
     // --- Show info + entries ---
     storage::ShowInfo show;
+    show.showId = 42;
     strncpy(show.showName, "Route 9 Fall Cruise-In", sizeof(show.showName));
+    strncpy(show.eventDate, "2026-09-12", sizeof(show.eventDate));
     show.scoreRangeMax = 10;
     show.maxScore = 40;
     show.overallImpressionEnabled = true;
@@ -75,7 +77,8 @@ void setup() {
 
     storage::ShowInfo showReloaded;
     bool showLoaded = storage::loadShowInfo(&showReloaded) && showReloaded.categoryCount == 2 &&
-                       strcmp(showReloaded.categories[1].name, "Paint") == 0;
+                       strcmp(showReloaded.categories[1].name, "Paint") == 0 && showReloaded.showId == 42 &&
+                       showReloaded.eventYear == 2026;
     logResult("show info round trip", showLoaded);
 
     storage::Entry entries[2];

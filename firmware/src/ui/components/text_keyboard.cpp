@@ -163,4 +163,8 @@ lv_obj_t* numericKeyboardOverlay(const char* initialText, const char* placeholde
     return buildOverlay(initialText, placeholder, maxLen, NUMBER_MAP, cb, ctx);
 }
 
+const char** plainTextKeyMap() { return TEXT_MAP; }
+
+void keyPressedIntoTextarea(lv_event_t* e) { keyPressedCb(e); }
+
 }  // namespace ui::components

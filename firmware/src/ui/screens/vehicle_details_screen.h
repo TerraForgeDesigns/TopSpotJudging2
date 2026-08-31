@@ -1,9 +1,12 @@
 // VEHICLE DETAILS — Participant, Year, Make, Model, Vehicle Type as
 // tappable fields, pre-filled with whatever Home Base already sent for
-// this entry number. Tapping a field opens the plain text/numeric
-// keyboard overlay from ui/components/text_keyboard.h for now — full
-// FW4 behavior (e.g. a searchable make/model selector) is a later
-// prompt's job; this screen's job is to wire the fields and pre-fill.
+// this entry number. Participant/Vehicle Type open the plain text
+// keyboard overlay (ui/components/text_keyboard.h); Year opens the
+// no-punctuation numeric keypad overlay
+// (ui/components/numeric_keypad_overlay.h), auto-closing on a plausible
+// 4-digit year; Make/Model push the flash-database-backed selector
+// screens (ui/screens/make_selector_screen.h,
+// ui/screens/model_selector_screen.h) — see DECISIONS.md's F4 entry.
 #pragma once
 
 #include "../screen_manager.h"

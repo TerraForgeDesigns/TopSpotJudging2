@@ -32,7 +32,24 @@ constexpr int MAX_CATEGORIES = 5;
 constexpr int MAX_AWARDS = 24;
 
 struct ShowInfo {
+    // Home Base's stable numeric id for this show (its `Show.id` primary
+    // key) — unlike showName, this can never collide across a renamed or
+    // duplicately-named show, so it's what storage::vehicle_recents.h
+    // scopes "recently used this show" against, not the name. 0 means "no
+    // show synced yet," never a real show's id.
+    int showId = 0;
     char showName[128] = "";
+    // ISO "YYYY-MM-DD", straight from Home Base's Show.event_date — see
+    // PROTOCOL.md. Used (via eventYear below) as the Year field's upper
+    // bound on the Vehicle Details screen; this is DATA Home Base already
+    // has and pushes down, not a live clock reading, so it needs no RTC,
+    // NTP, or network access at judging time — only that a sync already
+    // happened at least once, same precondition Categories/Awards have.
+    char eventDate[11] = "";
+    // Parsed once from eventDate's first 4 characters at load time (see
+    // show_data.cpp) — 0 if eventDate is empty/unparseable, meaning "no
+    // show synced yet," the same pre-first-sync state showId=0 signals.
+    int eventYear = 0;
     int scoreRangeMax = 5;
     int maxScore = 0;
     bool overallImpressionEnabled = false;

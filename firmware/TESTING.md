@@ -78,6 +78,54 @@ Record any deviation from the above against this file in DECISIONS.md —
 don't just fix it silently, since the next session needs to know the
 design was actually wrong somewhere, not just patched.
 
+## Vehicle make/model lookup (F4)
+
+**Setup**: `pio run -t upload-vehicle-seed` (needs a board attached — see
+`tools/upload_vehicle_seed.py`) writes `firmware/data/vehicle_seed.bin` to
+the `vehicle_seed` partition, separately from the normal firmware upload.
+Regenerate that file first if `firmware/tools/vehicle_seed_source.json`
+changed: `python firmware/tools/merge_seed_source.py` then
+`python firmware/tools/build_vehicle_seed.py`.
+
+1. **Search feels instant.** On Vehicle Details, tap Make, type a common
+   prefix ("che") and a mid-word fragment that only matches a substring
+   (something that appears mid-name, not at the start). Both must filter
+   the list with no perceptible lag as each key is tapped — this is
+   flagged, like every prior UI task's touch-latency/refresh checks, as
+   something this environment cannot verify without a board; confirm on
+   real hardware, not just the simulator.
+2. **Recently Used, this show.** Pick a make/model, back out to Vehicle
+   Details, re-enter the Make selector — the just-picked make should be
+   first under Recently Used with no typing. Finish the show (or clear
+   `/vehicle_recents.json` from the card) and confirm a NEW show starts
+   with an empty Recently Used, not the old show's list.
+3. **Other / Enter Manually, no vehicle_seed partition flashed.** On a
+   board `upload-vehicle-seed` was never run on (or after erasing just
+   that partition), open the Make selector: the list should show only
+   "Other / Enter Manually" — never a crash, never a blank/frozen screen.
+   Confirm manual entry still completes normally end to end.
+4. **Other / Enter Manually, no SD card.** Pull the SD card, open the
+   Make selector: Recently Used should simply be absent (no error), the
+   seed-backed search/list should still work (it doesn't touch the SD
+   card at all — see `storage::vehicle_db`), and Other/manual entry still
+   completes normally.
+5. **Search box carries typed text into Other.** Type something that
+   matches nothing (e.g. a nonsense string), tap Other / Enter Manually —
+   the manual-entry keyboard must open with that exact text already in
+   the field, per the task's "never type the same thing twice."
+6. **Make -> Model navigation.** With Model blank, picking a Make must
+   land directly on that Make's Model selector, no detour back through
+   Vehicle Details. With a Model already set, picking a DIFFERENT Make
+   whose model list doesn't include the current Model must clear it and
+   also land on the Model selector; picking a Make whose list DOES still
+   include the current Model must return straight to Vehicle Details with
+   Model untouched.
+7. **Year.** Type a 4-digit year inside the show's plausible range (1885
+   through the show's own event year + 1) — the keypad should close on
+   the 4th digit with no Done tap needed. Type a 4-digit year outside that
+   range — it must stay open with Done disabled and the "Not a plausible
+   year" hint shown, not silently accept it.
+
 ## Non-crash-safety checks
 
 Each bring-up target's own header comment (`bringup_display.cpp`,

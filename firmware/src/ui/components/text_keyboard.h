@@ -30,9 +30,32 @@ using TextInputCallback = void (*)(void* ctx, const char* text, bool accepted);
 lv_obj_t* textKeyboardOverlay(const char* initialText, const char* placeholder, uint32_t maxLen,
                                TextInputCallback cb, void* ctx);
 
-// Numeric-only entry (year, a typed score correction, ...) — same overlay
-// chrome, lv_keyboard in LV_KEYBOARD_MODE_NUMBER instead of text mode.
+// Numeric-only entry (a typed score correction, ...) — same overlay
+// chrome, lv_keyboard in LV_KEYBOARD_MODE_NUMBER instead of text mode. NOT
+// used for Year or a manually-typed Entry Number — those must never take
+// punctuation, and this mode's map includes a decimal point; see
+// components/numeric_keypad_overlay.h for the no-punctuation equivalent.
 lv_obj_t* numericKeyboardOverlay(const char* initialText, const char* placeholder, uint32_t maxLen,
                                   TextInputCallback cb, void* ctx);
+
+// The plain-ASCII lowercase keyboard map this file's own overlay uses
+// (see text_keyboard.cpp's header comment for why it's hand-rolled rather
+// than lv_keyboard's stock maps) — exposed so an INLINE, always-on-screen
+// keyboard (e.g. vehicle_selector_list.cpp's live-filter search box,
+// which can't use a pop-up overlay the way a single-field edit does) can
+// reuse the exact same key layout and event-handling contract instead of
+// duplicating it. Pass to lv_keyboard_set_map() with
+// LV_KEYBOARD_MODE_USER_1, and wire key presses via keyPressedIntoTextarea
+// below — never lv_keyboard's own textarea auto-wiring, which matches
+// special keys by LV_SYMBOL_* strings this font-set doesn't have.
+const char** plainTextKeyMap();
+
+// The exact key-press handling text_keyboard.cpp's own overlay uses
+// internally (Delete/Space handled explicitly, everything else inserted
+// literally) — call from an LV_EVENT_VALUE_CHANGED handler on a keyboard
+// built with plainTextKeyMap(), passing the target lv_textarea as
+// user_data via lv_event_get_user_data(e), exactly as this file's own
+// buildOverlay() does.
+void keyPressedIntoTextarea(lv_event_t* e);
 
 }  // namespace ui::components

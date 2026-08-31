@@ -127,7 +127,13 @@ the judge-chosen Show Awards available for nomination:
 
 ```jsonc
 {
+  "show_id": 42,                            // Show.id — stable across a rename, unlike show_name;
+                                             // see DECISIONS.md's F4 entry (vehicle_recents.h scopes
+                                             // "recently used this show" against this, not the name)
   "show_name": "Top Spot Autumn Cruise-In",
+  "event_date": "2026-09-12",                // Show.event_date, ISO YYYY-MM-DD — used offline as the
+                                             // Vehicle Details Year field's upper bound (event year + 1),
+                                             // no RTC/NTP/network needed at judging time — see DECISIONS.md
   "score_range_max": 10,
   "max_score": 40,                          // active categories x score_range_max —
                                              // computed by Home Base, never by the

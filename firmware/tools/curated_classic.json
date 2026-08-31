@@ -1,0 +1,40 @@
+{
+  "_provenance": "Supplemental layer for pre-1980s/discontinued American makes and motorcycle makes that NHTSA's vPIC catalog (vpic.nhtsa.dot.gov) under-covers (vPIC's model data is strongest from roughly the 1980s onward — see fetch_vpic.py's header). Compiled from well-established, broadly-documented automotive history, then cross-checked against each make's Wikipedia 'List of <Make> vehicles' page (or equivalent) via verify_curated_classic.py, which fetches the live page and confirms every model name below is actually present in it. Wikipedia's own prose/text is CC BY-SA licensed and is NOT copied here — only the bare fact 'this make produced a model with this name' is used, which is not copyrightable subject matter (a model name/nameplate is a fact, not creative expression). Model names are base nameplates only, no trim level (e.g. 'Charger', not 'Charger R/T') — matches how vPIC itself represents models. Motorcycle makes were sourced this way because vPIC's own motorcycle make list (1,684 entries) was spot-checked and found dominated by one-off custom/chopper builders, not useful for a car-show seed list.",
+  "makes": [
+    { "make": "Chevrolet", "models": ["Bel Air", "Nova", "Chevelle", "El Camino", "Fleetline", "Impala", "Corvair", "Vega", "Monza", "Biscayne", "Delray"] },
+    { "make": "Ford", "models": ["Fairlane", "Falcon", "Galaxie", "Thunderbird", "Torino", "Maverick", "Pinto", "Model A", "Model T", "Crown Victoria", "LTD"] },
+    { "make": "Pontiac", "models": ["GTO", "Firebird", "Bonneville", "Catalina", "Le Mans", "Tempest", "Trans Am", "Star Chief", "Ventura"] },
+    { "make": "Dodge", "models": ["Charger", "Coronet", "Dart", "Super Bee", "Polara", "Monaco", "Challenger"] },
+    { "make": "Plymouth", "models": ["Barracuda", "Road Runner", "Duster", "Fury", "Belvedere", "Satellite", "Valiant", "GTX"] },
+    { "make": "Oldsmobile", "models": ["Cutlass", "442", "Toronado", "Vista Cruiser", "Ninety-Eight", "Starfire"] },
+    { "make": "Buick", "models": ["Skylark", "Riviera", "Wildcat", "Electra", "Special", "LeSabre", "GSX"] },
+    { "make": "AMC", "models": ["Javelin", "AMX", "Rambler", "Gremlin", "Hornet", "Rebel", "Ambassador", "Marlin", "Pacer"] },
+    { "make": "Studebaker", "models": ["Avanti", "Hawk", "Champion", "Lark", "Commander", "Golden Hawk"] },
+    { "make": "Mercury", "models": ["Cougar", "Comet", "Monterey", "Marauder", "Cyclone", "Montego"] },
+    { "make": "Lincoln", "models": ["Continental", "Zephyr", "Capri", "Premiere"] },
+    { "make": "Chrysler", "models": ["300", "Imperial", "Newport", "New Yorker", "Windsor"] },
+    { "make": "Nash", "models": ["Ambassador", "Metropolitan", "Rambler", "Statesman"] },
+    { "make": "Hudson", "models": ["Hornet", "Commodore", "Wasp", "Super Six"] },
+    { "make": "Packard", "models": ["Clipper", "Caribbean", "Patrician", "Super Eight"] },
+    { "make": "DeSoto", "models": ["Fireflite", "Firedome", "Adventurer"] },
+    { "make": "Willys", "models": ["Jeep CJ", "Aero", "Overland"] },
+    { "make": "International Harvester", "models": ["Scout", "Travelall", "Harvester"] },
+    { "make": "Checker", "models": ["Marathon", "Aerobus"] }
+  ],
+  "_motorcycle_note": "Makes here that ALSO make cars/trucks (e.g. Honda, BMW, Suzuki, Triumph already come from vPIC's car list) get their motorcycle models MERGED into that same make entry by merge_seed_source.py's case-insensitive name match — a judge must see exactly one 'Honda,' not a separate 'Honda' and 'Honda Motorcycle.' Only genuinely motorcycle-only makes end up as new entries.",
+  "motorcycle_makes": [
+    { "make": "Harley-Davidson", "models": ["Sportster", "Softail", "Road King", "Electra Glide", "Fat Boy", "Panhead", "Shovelhead"] },
+    { "make": "Indian", "models": ["Chief", "Scout", "Springfield", "Chieftain"] },
+    { "make": "Triumph", "models": ["Bonneville", "Speed Triple", "Tiger", "Thunderbird"] },
+    { "make": "Honda", "models": ["Gold Wing", "CB750", "Rebel", "Shadow"] },
+    { "make": "Yamaha", "models": ["Virago", "Bolt", "XS650"] },
+    { "make": "Kawasaki", "models": ["Vulcan", "Ninja"] },
+    { "make": "Suzuki", "models": ["Boulevard", "Intruder"] },
+    { "make": "Ducati", "models": ["Monster", "Scrambler", "Panigale"] },
+    { "make": "BMW", "models": ["R nineT"] },
+    { "make": "Victory Motorcycles", "models": ["Vegas", "Hammer", "Cross Country"] },
+    { "make": "Moto Guzzi", "models": ["V7", "California", "Griso"] },
+    { "make": "Royal Enfield", "models": ["Bullet", "Classic 350", "Interceptor"] },
+    { "make": "Vespa", "models": ["Primavera", "GTS", "Sprint"] }
+  ]
+}

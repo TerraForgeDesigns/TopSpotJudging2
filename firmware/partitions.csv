@@ -1,0 +1,32 @@
+# Top Spot Judging handheld — custom partition table (F4).
+#
+# Derived from the stock huge_app.csv this project used through F3 (see
+# ../DECISIONS.md's F4 entry for the full reclaim math) — ONLY the old
+# `spiffs` line changes. `nvs`, `otadata`, `app0`, and `coredump` keep the
+# exact same offset and size they had before: app0 stays a full 3MB with
+# zero bytes given up, since today's firmware is a fraction of the
+# finished product (sync, battery management, and more are still to come)
+# and headroom shouldn't be sized against today's build.
+#
+# `spiffs` (896KB, 0xE0000) was allocated but never actually used —
+# photos live on the SD card, not internal flash — so it's pure reclaim,
+# not a tradeoff against anything real. It splits into:
+#   - `vehicle_seed` (F4's flash-mapped make/model database, read-only at
+#     runtime via esp_partition_mmap — see storage/vehicle_db.cpp):
+#     0x21000 (135,168B), 4KB-aligned, sized to the real
+#     firmware/data/vehicle_seed.bin build_vehicle_seed.py produces
+#     (measured 134,648B for 423 makes / 9,176 models — see DECISIONS.md).
+#   - The remaining 0xBF000 (782,336B / ~764KB) is left UNALLOCATED —
+#     future headroom, not pre-claimed by anything in this task.
+#
+# The learned-vehicle store (storage::vehicle_db's Preferences-based
+# "veh_learn" namespace) uses the EXISTING `nvs` partition below, which
+# nothing else in this project uses yet — no size change needed there
+# either.
+#
+# Name,         Type, SubType,  Offset,    Size,      Flags
+nvs,            data, nvs,      0x9000,    0x5000,
+otadata,        data, ota,      0xe000,    0x2000,
+app0,           app,  ota_0,    0x10000,   0x300000,
+vehicle_seed,   data, 0x40,     0x310000,  0x21000,
+coredump,       data, coredump, 0x3F0000,  0x10000,

@@ -30,6 +30,19 @@ void copyStr(char* dst, size_t dstSize, JsonVariantConst v) {
     dst[dstSize - 1] = '\0';
 }
 
+// Parses the leading "YYYY" off an ISO "YYYY-MM-DD" string — deliberately
+// not a general date parser (no library, no locale handling needed for
+// four ASCII digits). Returns 0 for anything that isn't exactly that
+// shape, which ShowInfo::eventYear treats the same as "no show synced
+// yet."
+int parseYear(const char* isoDate) {
+    if (isoDate == nullptr || strlen(isoDate) < 4) return 0;
+    for (int i = 0; i < 4; i++) {
+        if (isoDate[i] < '0' || isoDate[i] > '9') return 0;
+    }
+    return (isoDate[0] - '0') * 1000 + (isoDate[1] - '0') * 100 + (isoDate[2] - '0') * 10 + (isoDate[3] - '0');
+}
+
 // Reads `path` into a heap buffer, null-terminated. Returns nullptr (and
 // leaves *outLen untouched) if the file is missing, unreadable, or larger
 // than `maxSize` — caller treats that as "no data yet," never a crash.
@@ -63,7 +76,10 @@ bool loadShowInfo(ShowInfo* out) {
     free(buf);
     if (err) return true;  // malformed cache — never blocks boot, just judges with stale/no config until next sync
 
+    out->showId = doc["show_id"] | 0;
     copyStr(out->showName, sizeof(out->showName), doc["show_name"]);
+    copyStr(out->eventDate, sizeof(out->eventDate), doc["event_date"]);
+    out->eventYear = parseYear(out->eventDate);
     out->scoreRangeMax = doc["score_range_max"] | 5;
     out->maxScore = doc["max_score"] | 0;
     out->overallImpressionEnabled = doc["overall_impression_enabled"] | false;
@@ -91,7 +107,9 @@ bool loadShowInfo(ShowInfo* out) {
 
 bool saveShowInfo(const ShowInfo& info) {
     DynamicJsonDocument doc(MAX_SHOW_INFO_FILE_SIZE * 4);
+    doc["show_id"] = info.showId;
     doc["show_name"] = info.showName;
+    doc["event_date"] = info.eventDate;
     doc["score_range_max"] = info.scoreRangeMax;
     doc["max_score"] = info.maxScore;
     doc["overall_impression_enabled"] = info.overallImpressionEnabled;

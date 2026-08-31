@@ -24,6 +24,7 @@
 #include "camera/camera.h"
 #include "display/display.h"
 #include "storage/sd_card.h"
+#include "storage/vehicle_db.h"
 #include "ui/lvgl_port.h"
 #include "ui/screen_manager.h"
 #include "ui/screens/home_screen.h"
@@ -35,6 +36,9 @@ void setup() {
     Serial.println("\n[bringup-judging] starting");
 
     storage::begin();
+    storage::vehicle_db::init();  // safe even if vehicle_seed was never flashed — see storage/vehicle_db.h
+    Serial.printf("[bringup-judging] vehicle seed database: %s\n",
+                   storage::vehicle_db::seedAvailable() ? "loaded" : "not flashed (Other/manual entry still works)");
     camera::begin();  // non-blocking; the Photos screen itself waits out captureToFile()'s own timeout per-shot
 
     if (!ui::lvglInit()) {

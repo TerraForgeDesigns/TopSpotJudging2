@@ -935,6 +935,176 @@ building on top of it. Newest entries at the top of each section.
       including the battery-pull procedure — before this task's crash-safety claims
       (points 1-6 above) can be trusted rather than just argued for.
 
+- **F4 — Vehicle make/model lookup: flash-mapped seed database, a learned-store stub
+  for a sync module that doesn't exist yet, Recently Used, a no-punctuation Year
+  keypad, and the Make/Model selector screens.** This entry is a revision record as
+  much as a design one — the first plan draft for this task was reviewed and sent
+  back with five changes before implementation; all five are folded into the points
+  below rather than listed separately.
+  1. **Partition table: `app0` untouched at 3MB; the old unused `spiffs` allocation
+     (896KB, never actually used — photos live on SD, not internal flash) is
+     reclaimed for a single new `vehicle_seed` partition, sized to the REAL generated
+     binary, not a guess.** `firmware/tools/build_vehicle_seed.py` produced 134,648B
+     for the actual sourced dataset (423 makes, 9,176 models — see point 4); rounded
+     to the required 4KB flash-sector alignment, that's 0x21000 (135,168B). The
+     custom `partitions.csv` (replacing `huge_app.csv`, referenced from
+     `platformio.ini`) carves exactly that out of the old spiffs region at its same
+     offset (0x310000) and leaves the remaining 0xBF000 (782,336B, ~764KB)
+     deliberately UNALLOCATED — not pre-claimed by anything in this task. `nvs`,
+     `otadata`, `app0`, and `coredump` are byte-identical to the stock `huge_app.csv`
+     table F1-F3 used; confirmed via `gen_esp32part.py` decoding the actual compiled
+     `partitions.bin`, not just eyeballing the CSV. The learned store (point 3) uses
+     this SAME untouched `nvs` partition — nothing else in the project uses NVS yet,
+     so its full 20KB was already free, and no size change was needed there either.
+     This whole partition section is a direct reversal of the first plan draft, which
+     proposed shrinking `app0` to 2.5MB based on how much of it F3's build actually
+     used — correctly rejected on review: today's firmware is a fraction of the
+     finished product (sync, battery management, and more remain Open), so sizing
+     permanent flash layout against a snapshot of an unfinished build was the wrong
+     basis. Zero bytes come out of `app0` under this design.
+  2. **The seed dataset is sourced, not hand-invented, with per-entry provenance
+     carried in the data itself, not just a commit message.** Two documented layers,
+     merged by `firmware/tools/merge_seed_source.py` into
+     `firmware/tools/vehicle_seed_source.json`:
+     - **NHTSA vPIC** (`vpic.nhtsa.dot.gov`, a U.S. government API — public domain,
+       17 U.S.C. 105), fetched live by `firmware/tools/fetch_vpic.py`:
+       `GetMakesForVehicleType` for Car/Truck/Multipurpose Passenger Vehicle
+       (406 unique makes), then `GetModelsForMake` for every one of them (9,124
+       models, all model years vPIC has). vPIC's own Motorcycle type (1,684 makes)
+       was fetched and spot-checked, then DELIBERATELY EXCLUDED — dominated by
+       one-off custom/chopper builders ("MOONLIGHT CHOPPERS," "CRAZY DAGO CUSTOMS," a
+       few names in) rather than the recognizable manufacturers a car-show Best Bike
+       nomination actually needs.
+     - **Curated-classic supplement** (`firmware/tools/curated_classic.json`) for
+       what vPIC under-covers: pre-1980s/discontinued American makes (vPIC's model
+       catalog is strongest from roughly the 1980s on) and a genuinely motorcycle-only
+       make list (Harley-Davidson, Indian, Ducati, etc. — vPIC's own motorcycle data
+       being unusable per above). Every model name in this layer was cross-checked
+       against that make's real Wikipedia page by
+       `firmware/tools/verify_curated_classic.py` (a live fetch + substring match, not
+       an assertion) before inclusion — only the bare FACT "this make produced a model
+       with this name" is used, never Wikipedia's own prose, which stays CC BY-SA and
+       out of the shipped binary entirely. 152/154 names matched verbatim on their
+       make's consolidated list page; the remaining 2 (Chevrolet Delray, BMW R nineT)
+       were confirmed via their own dedicated Wikipedia pages instead, since some
+       older/niche models have a standalone page rather than a line in the
+       consolidated list — noted here rather than silently waved through.
+     - A curated motorcycle make that's ALSO a car/truck make (Honda, BMW, Suzuki,
+       Triumph — all already present via vPIC) has its motorcycle models MERGED into
+       that SAME make entry by `merge_seed_source.py`'s case-insensitive name match —
+       deliberately never a second "Honda" alongside a "Honda Motorcycle."
+     - 58 model names from vPIC's own raw data were dropped during merge (logged, not
+       silently discarded) for failing the ASCII/47-byte checks
+       `storage::DraftCar.make/model`'s `char[48]` fields require — almost entirely
+       vPIC data-quality noise from its broader VIN-decode registry (upfitter/trailer
+       manufacturer names mis-grouped under a car make, e.g. "Golden Eagle Trailer
+       Manufacturing & Welding Works" under "EAGLE," plus a couple of non-ASCII
+       characters in Land Rover model codes) — not curated-data casualties.
+  3. **The learned store is real code with nowhere to be called from yet, and that's
+     the honest state, not a stub pretending otherwise.** `storage::vehicle_db`'s
+     `saveLearnedVehicle()` writes into a `Preferences` (NVS) blob under namespace
+     `veh_learn`, key `models` — a single JSON array `[{make, model}, ...]`, not one
+     key per make, because ESP32 NVS keys cap at 15 characters and several real make
+     names (e.g. "International Harvester") don't fit. Nothing in this codebase calls
+     `saveLearnedVehicle()` yet: PROTOCOL.md's `vehicle_additions` is meant to arrive
+     over WiFi sync, and `network/wifi_sync.h` doesn't exist (still Open). Every query
+     function (`findMakes`/`findModels`/`modelBelongsToMake`) already merges the
+     learned store in regardless — on a real device today it will simply always be
+     empty until a future sync task starts writing to it.
+  4. **Recently Used is scoped by Show ID, not Show Name — a real fix from plan
+     review, not an original design.** `storage::ShowInfo` gained `int showId` (Home
+     Base's `Show.id`) and `char eventDate[11]` / `int eventYear` (from
+     `Show.event_date`) — see point 5. PROTOCOL.md's `configuration` example now
+     documents `show_id` and `event_date` alongside the fields it already had; this is
+     a DOCS-ONLY change on the Home Base side — no `homebase/` code touched, since the
+     sync endpoint that would actually serialize this doesn't exist yet either (same
+     "not yet wired, honestly stated" situation as point 3). `storage::vehicle_recents`
+     stores the show id a `/vehicle_recents.json` file was built under; a mismatch
+     against the CURRENT `ShowInfo.showId` means "new show, not just a renamed one,"
+     so the recents reset — a plain string comparison on `show_name` would have missed
+     exactly that case (a show renamed mid-event, or two shows that happen to share a
+     name).
+  5. **Year's upper bound is the show's own event year + 1, not a hardcoded future
+     date — also a plan-review fix.** `ShowInfo::eventYear` is parsed once, at
+     `loadShowInfo()` time, from `eventDate`'s first 4 ASCII digits (a deliberately
+     tiny hand-rolled parse, not a date library — see `show_data.cpp::parseYear`).
+     Range: `[1885, eventYear + 1]`. This is still fully offline and RTC/NTP-free —
+     `event_date` is DATA Home Base already has and pushes down at sync time, not a
+     live clock reading, so it needs nothing beyond "a sync has happened at least
+     once," the same precondition Categories/Awards already carry. Pre-first-sync
+     (`eventYear == 0`), the range falls back to a wide `[1885, 2035]` rather than
+     rejecting every input — flagged in `vehicle_details_screen.cpp` as the
+     PRE-SYNC-ONLY path, never the normal one.
+  6. **`numeric_keypad_overlay` is a NEW component, not a reuse of
+     `numericKeyboardOverlay`** (`text_keyboard.h`) — the latter's `lv_keyboard`
+     NUMBER_MAP includes a decimal point, which fails the task's explicit "no
+     punctuation" requirement for Year. The new overlay wraps
+     `components::numericKeypad` (already existed, digits + Backspace only) in the
+     same modal chrome `text_keyboard.cpp`'s overlay uses (field visible above,
+     Cancel leaves the prior value untouched, self-deletes after Done/Cancel), adding
+     `autoAcceptLen` + a `Validator` callback: typing the 4th digit of a plausible
+     year closes the overlay with no Done tap needed; an implausible 4th digit leaves
+     it open, Done disabled, with an inline hint — both the auto-accept path and the
+     manual Done fallback are gated by the exact same validity check, so there's no
+     way to bypass one but not the other.
+  7. **The Make/Model selector is a NEW purpose-built component
+     (`vehicle_selector_list`), not an adaptation of the existing
+     `searchable_selector.h`.** The two diverge too much to share: `searchable_selector`
+     holds a flat in-memory `const char**` and only refilters after a separate
+     keyboard OVERLAY's Done tap; this task needs an INLINE, always-on-screen keyboard
+     that refilters on every keystroke (task item 4.1 — "filtering as they type"), a
+     merged seed+learned data source instead of a plain array, and a Recently Used
+     section. `searchable_selector.h` is untouched, still demo-only
+     (`component_demo_screen.cpp`'s only caller). The inline keyboard reuses
+     `text_keyboard.cpp`'s plain-ASCII key map and key-handling logic directly — both
+     were factored out into `plainTextKeyMap()` / `keyPressedIntoTextarea()` on
+     `text_keyboard.h` rather than duplicated.
+  8. **Search is a full bounded linear scan, not a binary-search-narrowed one — a
+     deliberate refinement of the plan's own wording, not what got implemented
+     blindly.** The plan described "binary search plus a bounded scan"; building it
+     honestly required admitting binary search can't help a SUBSTRING match ("vette"
+     finding "Corvette" could land anywhere in a sorted table, not just where a prefix
+     comparison would point) — only a full scan is correct for that. With ~423 makes
+     and each make's own model range small, a full scan costs well under a
+     millisecond regardless, so nothing is lost. Binary search IS used, correctly,
+     for the one place it actually helps: `findExactMakeIndex()`, an EXACT lookup
+     against the sorted make table, which backs `modelBelongsToMake()` (point 9) and
+     the Make->Model navigation rule (point 9).
+  9. **Make -> Model navigation auto-advances exactly when the task's revised
+     instructions describe, via `screen_manager::pop()` immediately followed by
+     `push(ModelSelectorScreen::create)` inside the same click handler.** Both calls
+     are synchronous stack mutations that happen before LVGL's own render tick runs
+     (see F2's screen-manager point 9: "destroy immediately, rebuild immediately"),
+     so there's no visible flash of Vehicle Details in between and the net stack
+     depth is identical either way — `ModelSelectorScreen`'s own completion path
+     never needs to know whether it was reached by auto-advance or a direct tap; it's
+     always a plain `pop()`. Rule: Model blank -> advance; Model set but no longer
+     valid under the newly-chosen Make (checked via `modelBelongsToMake`, point 8) ->
+     clear it, advance; Model set and still valid (including "Make didn't actually
+     change") -> leave it, return to Vehicle Details.
+  10. **Flash/RAM report** (real `pio run` size output): `bringup-judging` (F3's full
+      flow plus this task's screens/storage/vehicle_db) now links at 756,177B flash
+      (24.0% of the still-3MB `app0` — up from F3's 735,245B, so this task's own
+      addition to `app0` is ~20,932B, negligible next to the headroom point 1
+      preserved) and 81,592B static RAM (24.9%). `handheld` (the integrated
+      target, `main.cpp` still not calling into any of this) is 443,181B flash,
+      barely above F3's 440,669B — confirms this task's additions are still fully
+      tree-shaken out until `main.cpp` actually calls into them, same pattern F2/F3
+      already established.
+  11. **Physical verification limits — same caveat as every prior firmware task, plus
+      two more that are specific to this one.** Nothing here ran on real hardware.
+      Beyond the usual (touch/search feel, theme, refresh quality — see
+      `firmware/TESTING.md`'s new F4 section), TWO further gaps that are inherent to
+      this environment, not just "not gotten to yet": `pio run -t
+      upload-vehicle-seed` (`tools/upload_vehicle_seed.py`) registers correctly and
+      fails with PlatformIO's own standard "no upload port" error when actually run
+      here — confirming the target mechanism works, but the real `esptool` flash
+      write to a live board is unverified; and the vPIC/Wikipedia fetches (points 2)
+      required live internet access, which this dev environment happened to have —
+      if a future session regenerates the seed data without it, `fetch_vpic.py` and
+      `verify_curated_classic.py` will simply fail loudly (network errors), never
+      silently produce bad data.
+
 ## Open
 
 - **`camera::CAPTURE_MODE_PHOTO` (1280x720) is unverified against real hardware.** F3
