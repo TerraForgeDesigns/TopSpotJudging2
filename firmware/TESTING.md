@@ -301,6 +301,51 @@ A simulated show, run on a real handheld, battery starting from a full charge:
    judge who's genuinely active most of the time), tightening
    `backlightDimSeconds`/`backlightOffSeconds` is the first thing to try.
 
+## Handheld simulator (SIM1)
+
+Unlike every section above, this one needs no board at all — the whole point is
+running the flow in a browser instead. What's already been verified without one
+(see DECISIONS.md's SIM1 entry for the full account): every simulator asset
+resolves from a live `uvicorn` instance, a real `POST /api/v1/sync` round trip
+against a real materialized show, a real scored-car submission accepted, and a
+real 150+-car range escalation surfacing through to a sync response (this last one
+required a real Home Base bug fix — `services/cars.py::add_cars()` wasn't
+flushing before its own escalation count query — see DECISIONS.md point 3). What
+still needs a real browser:
+
+1. **Start Home Base** (`cd homebase && .venv/Scripts/python.exe -m uvicorn
+   app.main:app`), make sure a show is active (`/shows`), then open
+   `http://127.0.0.1:8000/simulator`.
+2. **Walk the task's own fidelity checklist side-by-side against the named
+   firmware source file for each**: the on-screen text keyboard
+   (`text_keyboard.cpp`), numeric keypad (`numeric_keypad.cpp`/
+   `numeric_keypad_overlay.cpp`), Make selector — search, Recently Used, Other
+   (`make_selector_screen.cpp`), Model selector scoped to the chosen Make
+   (`model_selector_screen.cpp`), manual entry carrying typed text into the
+   keyboard for both, both scoring layouts (row for 1-5/1-10, 5x5 grid for 1-25 —
+   `score_row.cpp`/`score_grid.cpp`), the award nominations checklist
+   (`checklist_row.cpp`), and the Scoring Updated notice (`scoring_updated_
+   screen.cpp`) — confirm wording matches exactly, not just "looks similar."
+3. **Force a real range escalation** from inside the browser: add 150+ cars to
+   the active show via Home Base's own `/shows/{id}` edit page, then tap Update
+   Now on the simulator's Home screen — confirm the Scoring Updated overlay
+   fires with the correct new range, and confirm it does NOT fire on a device's
+   very first-ever sync (only after a config was already applied once).
+4. **Out of Range toggle** (Settings): judge a car with it OFF, confirm it syncs
+   immediately; turn it ON, judge another, confirm the sync attempt fails
+   exactly like a missed WiFi scan (no network tab activity at all), the car
+   stays queued, and "N cars waiting to send" appears on Home; reload the page
+   and confirm the queue survived (localStorage); turn Out of Range back OFF and
+   confirm the queue drains on the next attempt.
+5. **Physical keyboard opt-in**: with the Settings checkbox OFF, confirm typing
+   on a physical keyboard does nothing on any text/numeric field; turn it ON,
+   confirm typed keys produce identical results to tapping the same on-screen
+   keys (same overlay, same Done/Cancel behavior, same max-length enforcement).
+6. **Regenerate vehicle data if the firmware's seed source changes**: `cd
+   firmware && python tools/export_vehicle_data_for_simulator.py` — confirm the
+   printed make/model counts match F4's own numbers before trusting the
+   simulator's Make/Model selectors again.
+
 ## Non-crash-safety checks
 
 Each bring-up target's own header comment (`bringup_display.cpp`,

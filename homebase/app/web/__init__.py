@@ -9,6 +9,7 @@ from app.web.photos import router as photos_router
 from app.web.results import router as results_router
 from app.web.show_wizard import router as show_wizard_router
 from app.web.shows import router as shows_router
+from app.web.simulator import router as simulator_router
 from app.web.stubs import router as stubs_router
 
 router = APIRouter()
@@ -21,6 +22,7 @@ router.include_router(handhelds_router)
 router.include_router(conflicts_router)
 router.include_router(results_router)
 router.include_router(awards_router)
+router.include_router(simulator_router)
 router.include_router(stubs_router)
 
 __all__ = ["router"]

@@ -124,6 +124,7 @@ def add_cars(db: Session, show: Show, count: int) -> AddCarsResult:
     bump_show_data_revision(db, show)
     for i in range(first, last + 1):
         db.add(Car(show_id=show.id, entry_number=f"{i:03d}", data_revision_at_change=show.show_data_revision))
+    db.flush()  # autoflush is off (see db.py) — check_and_escalate's own car count must see the rows just added
 
     escalated = check_and_escalate(db, show)
     db.commit()

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Handheld Simulator — {{ show_name }}</title>
+  <link rel="stylesheet" href="/static/simulator/simulator.css">
+</head>
+<body>
+  <div class="sim-page">
+    <div class="sim-controls">
+      <h1>Handheld Simulator</h1>
+      <div class="sim-hint">
+        Reproduces the ESP32 handheld's screens against show
+        "{{ show_name }}". This talks to the real sync API on this same
+        origin — nothing here is mocked. Use the device's own Settings
+        screen (inside the frame) to change theme, sync interval, Out of
+        Range, and the physical-keyboard opt-in.
+      </div>
+    </div>
+
+    <div class="device-frame" id="device-frame">
+      <div class="status-bar">
+        <div style="display:flex; align-items:center;">
+          <span class="device-label" id="device-label">sim-1</span>
+          <span class="judge-label" id="judge-label"></span>
+        </div>
+        <div class="status-right">
+          <div class="status-dot-group">
+            <span class="status-dot" id="conn-dot"></span>
+            <span id="conn-label">NOT CONNECTED</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen-header" id="screen-header">
+        <button class="back-btn" id="back-btn" hidden>Back</button>
+        <div class="header-title" id="header-title"></div>
+      </div>
+
+      <div class="screen-content" id="screen-content"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/simulator/js/main.js"></script>
+</body>
+</html>
