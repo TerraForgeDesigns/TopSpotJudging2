@@ -713,6 +713,130 @@ building on top of it. Newest entries at the top of each section.
   10-to-200-car Top Awards list is a ranked table (already served by `/results`), not
   a one-at-a-time reveal ceremony — CONTEXT.md's presentation description is
   specifically "each winning car," singular, one Show Award at a time.
+- **F2 — Handheld UI foundation: LVGL on top of the already-verified LovyanGFX driver,
+  a full component library, and a leak-preventing screen manager.** This is a large
+  entry — see each numbered point below for one piece of it.
+  1. **LovyanGFX stays the display/touch driver; LVGL is added as the widget/graphics
+     layer on top of it, via a ~15-line flush/read adapter (`src/ui/lvgl_port.cpp`) —
+     not a second driver.** `src/display/lcd_config.h`'s RGB-panel timing and GT911
+     touch config (porches, pulse widths, the 12MHz pixel clock, I2C address) were
+     already sourced from Elecrow's verified example back in F1 (see pins.h's citation)
+     and already had a bring-up test (`bringup-display`) confirming a real board draws
+     correctly and tracks touch — none of that is touched or re-derived here. LVGL's
+     `flush_cb` calls `display::gfx().pushImage(...)`; its `read_cb` calls
+     `display::getTouch(...)`. This is "don't hand-roll a display driver" satisfied
+     literally: the driver is LovyanGFX, exactly as before.
+  2. **LVGL pinned to v8.3.11, not v9.** v9 changed enough of the widget/font/style API
+     to be its own migration; v8 is what the vast majority of published ESP32 RGB-panel
+     LVGL examples (including the CrowPanel/Elecrow community ones pins.h already cites)
+     are written against, so v8 keeps this integration on well-trodden ground.
+  3. **LVGL's object heap is PSRAM-backed via `LV_MEM_CUSTOM`, hooked to
+     `heap_caps_malloc(..., MALLOC_CAP_SPIRAM)`** (`src/ui/lvgl_psram_alloc.cpp`) — every
+     widget/style/animation LVGL ever allocates comes from the 8MB PSRAM, never the
+     ESP32-S3's ~512KB internal SRAM, which the camera DMA buffers, FreeRTOS task
+     stacks, and the WiFi stack all need at the same time. The draw buffers are
+     separately PSRAM-allocated too (2 x 800x48px, double-buffered, ~150KB total —
+     LVGL's own documented ~1/10-screen-height guideline; see `lvgl_port.cpp`'s
+     comment for the tuning knob if requirement 7's latency budget isn't met on real
+     hardware).
+  4. **`LV_TICK_CUSTOM` is off — `lv_tick_inc()` is called by hand from `loop()`
+     against `millis()` deltas, not via `LV_TICK_CUSTOM_INCLUDE "Arduino.h"`.**
+     `lv_tick.c` is compiled as plain C; `Arduino.h` is a C++ header (String, Print,
+     ...) and doesn't compile when pulled into a `.c` translation unit. Same reasoning
+     applies to `LV_MEM_CUSTOM_INCLUDE` — it points at a header with C-linkage-only
+     function prototypes (`lvgl_psram_alloc.h`), never at anything C++.
+  5. **Fonts are the exact same files Home Base self-hosts**
+     (`homebase/app/static/fonts/*.woff2` — Archivo 600/700/800, IBM Plex Sans
+     400/500/600), decompressed to `.ttf` via `fontTools.ttLib.woff2` (lv_font_conv
+     doesn't accept woff2 input directly) and converted with `lv_font_conv` (the
+     standard LVGL font tool, run via `npx`). Reproduction, per font:
+     ```
+     python -m fontTools.ttLib.woff2 decompress homebase/app/static/fonts/<name>.woff2 -o <name>.ttf
+     npx lv_font_conv --font <name>.ttf --size <px> --bpp 4 --format lvgl \
+       -r 0x20-0x7E --lv-font-name ui_font_<id> -o firmware/src/ui/fonts/ui_font_<id>.c
+     ```
+     The intermediate `.ttf` files are NOT committed (derived, byte-reproducible from
+     Home Base's already-committed `.woff2` sources) — only the 10 generated `.c` font
+     files are. Glyph range is ASCII `0x20-0x7E` only, no LVGL symbol glyphs
+     (`LV_SYMBOL_*` live in a different codepoint range these fonts don't cover) — every
+     place that would normally use a symbol icon (Back, Delete) uses plain ASCII text
+     instead; see `screen_manager.cpp` and `numeric_keypad.cpp`. Exactly 10 (family,
+     weight, size) combinations exist, chosen per the component that actually needs
+     each one — see `src/ui/fonts/fonts.h` for the full mapping and role of each.
+  6. **Daylight Mode's exact hex values are new — DESIGN.md only described it
+     qualitatively before this task ("near-black text on a white/very light
+     background").** Chosen in `ui/theme.cpp`: a light-gray (not stark white) app
+     background to cut glare, white cards, gold and the three status colors kept
+     IDENTICAL between themes (brand/semantic colors, not surfaces, so they shouldn't
+     shift with ambient light). Not WCAG-measured against these specific new pairings
+     the way DESIGN.md's dark-mode table is — flagged here rather than presented as
+     verified.
+  7. **The theme system is NOT LVGL's built-in theme (`lv_theme_default` etc.) reskinned
+     — it's a parallel, from-scratch token system** (`ui::theme`): one `Palette` struct
+     per mode, and a fixed set of shared `lv_style_t` objects every component applies
+     via `lv_obj_add_style()` — never a raw `lv_color_hex()` call in a screen or
+     component. `theme::setMode()` mutates those style objects in place and calls
+     `lv_obj_report_style_change(nullptr)`, LVGL's documented mechanism for "every
+     object using this style, redraw now" — that's the entire mechanism behind runtime
+     theme switching needing zero per-screen code. The one deliberate exception is
+     `modal_confirm.cpp`'s dim scrim, which is a literal `black @ 50% opacity` — not a
+     DESIGN.md token, called out in a comment at the point of use.
+  8. **`src/display/theme.h` (the old raw-RGB565-constant module from F1) is untouched
+     and still exists, used only by the isolated `bringup_display.cpp` test** — it
+     predates this task and that test's own bring-up verification. `src/ui/theme.h` is
+     the new, separate, real system every LVGL-based component uses; the two never
+     share values or get confused for each other on purpose.
+  9. **Screen manager: only ONE screen's widget tree exists in memory at a time.**
+     Pushing a new screen destroys the current one's tree immediately (`lv_obj_del`,
+     LVGL's real recursive-free, not a hide); popping reconstructs the previous screen
+     fresh from a lightweight `(factory, arg)` pair recorded on a fixed-size stack, not
+     from a kept-alive object. This was the deliberate, safer reading of "screens must
+     create and destroy cleanly" against the task's own explicit worry (a 768KB
+     resident framebuffer + 4MB flash means an accumulation of hidden-but-not-freed
+     screens is exactly the kind of leak that only shows up hours into a real show).
+     A screen that needs to remember something across being popped-to later owns that
+     itself as the `void* arg` passed back into its own factory.
+  10. **Every callback-taking component frees its own small heap allocation via the
+      widget's own `LV_EVENT_DELETE`** (e.g. `numeric_keypad.cpp`'s `CallbackCtx`,
+      `list_row.cpp`'s `RowCtx`) — tied to the SAME `lv_obj_del()` that already
+      recursively frees the widget tree, so nothing can leak independently of the
+      screen-teardown path #9 relies on.
+  11. **Physical verification limits — read before trusting requirement 1's "confirm a
+      clean refresh" or requirement 7's performance numbers as done.** Nothing in this
+      task was run on real hardware — there is no board attached to this environment,
+      same limitation recorded for F1's bring-up code (see "Firmware bring-up code is
+      verified by actually compiling it," above). What WAS verified: `pio run` succeeds
+      (a clean link) for `bringup-ui`, `handheld`, and all three existing bring-up
+      environments — no regression. `bringup_ui.cpp`'s header comment lists exactly
+      what a human needs to check on the actual board (tearing, touch latency feel,
+      theme persistence across a power cycle, repeated navigation not degrading) —
+      this task's requirement 7 ("if the RGB panel plus LVGL config cannot hold that,
+      tell me BEFORE we build screens on top of it") is answered honestly: it CANNOT
+      be told either way without that hardware check.
+  12. **Flash/PSRAM report** (all from real `pio run` size output, not estimated):
+      - `bringup-display` (F1 baseline — display + touch, no LVGL): 378,609 B flash
+        (12.0% of the 3,145,728 B `huge_app.csv` app partition), 20,188 B static RAM.
+      - `bringup-ui` (full UI foundation: LVGL + theme + all 14 components + fonts +
+        screen manager + debug menu + component demo screen, SD included for theme
+        persistence): 693,197 B flash (22.0% of the app partition; 16.5% of the raw
+        4MB flash chip), 72,176 B static RAM (22.0%).
+      - UI foundation's own incremental cost (`bringup-ui` minus the `bringup-display`
+        baseline, SD init included): ~314,588 B flash (~7.5% of the raw 4MB chip),
+        ~51,988 B static RAM.
+      - The 10 embedded fonts alone: 111,228 B of that flash total (measured via
+        `xtensa-esp32s3-elf-size` on each font's compiled `.o`, not file size) — about
+        2.65% of the raw 4MB chip on their own.
+      - PSRAM: 153,600 B (150KB) for the two LVGL draw buffers, deterministic/fixed.
+        LVGL's own object-heap PSRAM usage is NOT a fixed number — it grows and shrinks
+        with however many widgets the current screen has alive, by design (see #9) —
+        and can only be measured by querying `heap_caps_get_free_size(MALLOC_CAP_SPIRAM)`
+        on real hardware, which this session couldn't do. Reported as a known gap, not
+        guessed.
+      - `handheld` (the integrated target — `main.cpp` doesn't call into `ui::` at all
+        yet) links at 437,641 B: smaller than `bringup-ui` because the linker's
+        dead-code elimination strips every unreferenced UI component and font when
+        nothing calls it — confirms the component library is fully tree-shakeable once
+        real screens start selectively using pieces of it, not an all-or-nothing cost.
 
 ## Open
 
