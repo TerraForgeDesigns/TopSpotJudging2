@@ -60,7 +60,14 @@ public:
             cfg.pin_vsync = (gpio_num_t)PIN_LCD_VSYNC;
             cfg.pin_hsync = (gpio_num_t)PIN_LCD_HSYNC;
             cfg.pin_pclk = (gpio_num_t)PIN_LCD_PCLK;
-            cfg.freq_write = 12000000;
+            // 24 MHz matches Elecrow's own verified PlatformIO reference for
+            // this exact panel (elecrow.com/wiki/CrowPanel_ESP32_7.0-inch_with_PlatformIO.html).
+            // At the porches below (928 x 525 px/frame = 487,200), 12 MHz was
+            // only ~24.6 Hz -- below the flicker-fusion threshold and the
+            // likely cause of visible shimmer/banding; 24 MHz is ~49.3 Hz.
+            // See DECISIONS.md's physical bring-up entry (08-31) before
+            // changing this again -- it's evidence-based, not a guess.
+            cfg.freq_write = 24000000;
 
             cfg.hsync_polarity = 0;
             cfg.hsync_front_porch = 40;

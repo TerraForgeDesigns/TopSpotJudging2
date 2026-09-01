@@ -84,6 +84,7 @@ oldest at the top — append new ones at the end, matching the archive's own ord
 - **INT2 — Router setup guide; found and fixed a real bug (default Home Base address pointed at the router).** 08-31 — [why](docs/decisions-archive.md#d73)
 - **Camera pin correction (pre-solder): MOSI/MISO moved off UART0 (GPIO43/44) onto I2S pins (GPIO17/18) at U11.** 08-31 — [why](docs/decisions-archive.md#d74)
 - ~~Camera on GPIO43/44 (UART0) accepted as permanent console loss once soldered — filed "not a blocker."~~ REVERSED 08-31, see the entry directly above. [why](docs/decisions-archive.md#o13)
+- **Physical bring-up on real CrowPanel V3.0 hardware: RGB LCD, GT911 touch, and microSD all PASS.** Touch tracks correctly with the expected yellow trail — the earlier dead-touch report did not reproduce and was never written into this log, so there was nothing here to correct. Fixed one real mismatch causing visible shimmer: `freq_write` was 12MHz against Elecrow's documented 24MHz for this panel. 08-31 — [why](docs/decisions-archive.md#d75)
 
 ## Open
 

@@ -2075,3 +2075,53 @@ Full-length sourcing for the Open entries kept in DECISIONS.md's own Open sectio
   UART0 entirely (GPIO17/18/42 instead — see `pins.h`) rather than accept this
   trade-off as permanent.
 
+<a id="d75"></a>
+- **First physical bring-up on real CrowPanel DIS08070H V3.0 hardware: RGB LCD
+  (PASS), GT911 touch (PASS), microSD mount/write/read (PASS). Camera not
+  connected/tested. Battery still blocked** (no ADC pin, see [o11](#o11)).
+  Touch was checked specifically because an earlier session had flagged a
+  dead-touch concern before real hardware existed to test on — on the real
+  board, `bringup-display` tracks a finger correctly with the expected yellow
+  crosshair trail and UI elements in `bringup-ui`/`bringup-judging` respond to
+  taps normally. That earlier concern never made it into this log or any
+  other tracked doc as a stated fact (checked `DECISIONS.md`, this archive,
+  `TESTING.md`, `README.md`, and git history for any "touch broken" claim —
+  none exists), so there was no false claim to retract, only the open
+  question to close: touch works, unmodified, on real hardware. No GT911
+  address, touch pin, I2C frequency, rotation, or LovyanGFX touch config
+  changed as part of this — a verified-working touch path was left alone.
+  Remaining issue: visible shimmer/banding on the LCD, seen by eye (not a
+  camera artifact), image content correct but not stable. Root-caused to a
+  real, confirmable mismatch rather than tuned by trial and error: Elecrow's
+  own PlatformIO reference for this exact panel
+  (elecrow.com/wiki/CrowPanel_ESP32_7.0-inch_with_PlatformIO.html) specifies
+  `freq_write = 24000000`; `src/display/lcd_config.h` had `12000000`. Every
+  other RGB timing value already matched Elecrow's spec exactly — all six
+  porch/pulse values (hsync front/pulse/back 40/48/40, vsync front/pulse/back
+  1/31/13), both sync polarities, `pclk_active_neg`, and all four RGB-bus
+  control pins (HENABLE=41, VSYNC=40, HSYNC=39, PCLK=0) — so the pixel clock
+  was the one real discrepancy, not a guess among many candidates. Using this
+  project's own porch values, one frame is 928 × 525 = 487,200 pixels; at
+  12MHz that's ~24.6Hz, well under the flicker-fusion threshold and squarely
+  in "visibly unstable to the naked eye but not necessarily to a camera's
+  longer per-frame integration time" territory — consistent with the reported
+  symptom. At 24MHz it's ~49.3Hz. Changed `freq_write` to `24000000`
+  (`src/display/lcd_config.h`), nothing else — no porch, polarity, pin, or
+  touch value touched. Two things checked and ruled out as the primary cause,
+  not just unconsidered: (1) Elecrow's official reference also warns that an
+  *unpatched* LovyanGFX RGB bus causes "VSYNC switching failure ... or
+  abnormal double-buffer addresses" via its own `scripts/patch_lovyangfx.py`
+  — this repo has no such patch and no `scripts/` directory referencing one,
+  but that Elecrow warning is written against Espressif's stock
+  `esp_lcd_new_rgb_panel` driver path; the vendored `LovyanGFX@1.2.28`
+  actually in use here (`Bus_RGB.cpp`) bypasses that ESP-IDF API entirely with
+  its own hand-rolled RGB/DMA bus and a single (not double) frame buffer, so
+  the patch's premise doesn't obviously carry over — flagged as unresolved
+  rather than papered over. (2) PSRAM bandwidth contention (Espressif's other
+  documented cause, ~48MB/s sustained needed at 24MHz/16bpp against PSRAM
+  shared with the CPU) can't be fully ruled out from source reading alone,
+  but `bringup-display` is a minimal test with no LVGL and near-zero other
+  PSRAM traffic, which weighs against it being the dominant term here. If
+  shimmer persists after the clock fix, this is the next thing to
+  instrument — not another clock/porch guess.
+
