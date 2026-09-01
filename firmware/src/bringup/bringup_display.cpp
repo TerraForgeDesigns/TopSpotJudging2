@@ -56,9 +56,11 @@ void setup() {
 
 void loop() {
     int32_t x, y;
+
     if (display::getTouch(&x, &y)) {
         Serial.printf("[bringup-display] touch at (%ld, %ld)\n", (long)x, (long)y);
         gfx().fillCircle(x, y, 4, theme::GOLD_500);
     }
+
     delay(20);
 }

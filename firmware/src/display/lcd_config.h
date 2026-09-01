@@ -67,7 +67,7 @@ public:
             // likely cause of visible shimmer/banding; 24 MHz is ~49.3 Hz.
             // See DECISIONS.md's physical bring-up entry (08-31) before
             // changing this again -- it's evidence-based, not a guess.
-            cfg.freq_write = 24000000;
+            cfg.freq_write = 15000000;
 
             cfg.hsync_polarity = 0;
             cfg.hsync_front_porch = 40;
