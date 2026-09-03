@@ -29,3 +29,6 @@ homebase/data/*
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Local Waveshare factory flash backup
+Waveshare-P4-Factory-Backup.bin
