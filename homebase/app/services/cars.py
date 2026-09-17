@@ -26,6 +26,8 @@ class CarRow:
     score: int | None  # None means not yet judged — never a phantom 0
     has_car_photo: bool
     has_judge_sheet_photo: bool
+    photos_required: bool
+    submission_source: str | None
 
 
 def list_cars(db: Session, show_id: int) -> list[CarRow]:
@@ -67,6 +69,12 @@ def list_cars(db: Session, show_id: int) -> list[CarRow]:
                 score=submission_total(submission) if submission else None,
                 has_car_photo=PhotoType.CAR in types,
                 has_judge_sheet_photo=PhotoType.JUDGE_SHEET in types,
+                photos_required=(
+                    (submission.vehicle_photo_required or submission.judge_sheet_photo_required)
+                    if submission
+                    else True
+                ),
+                submission_source=submission.source.value if submission else None,
             )
         )
     return rows

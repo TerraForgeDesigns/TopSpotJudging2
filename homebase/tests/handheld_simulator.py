@@ -84,10 +84,12 @@ class SimulatedHandheld:
     ) -> dict:
         if self.configuration is None:
             raise RuntimeError(f"{self.handheld_id}: call check_in() before judge_car() — see category_id().")
+        closed_at_uptime_ms = self._next_uptime_ms()
+        photo_token = f"{entry_number}_{closed_at_uptime_ms:08d}"
         return {
             "entry_number": entry_number,
             "judge_name": judge_name,
-            "closed_at_uptime_ms": self._next_uptime_ms(),
+            "closed_at_uptime_ms": closed_at_uptime_ms,
             "participant": participant,
             "year": year,
             "make": make,
@@ -99,6 +101,8 @@ class SimulatedHandheld:
             "scores": [{"category_id": self.category_id(name), "points": points} for name, points in scores.items()],
             "overall_impression": overall_impression,
             "nominations": [self.award_id(name) for name in (nominations or [])],
+            "vehicle_photo_path": f"/sdcard/topspot/photos/vehicle/vehicle_{photo_token}.jpg",
+            "judge_sheet_photo_path": f"/sdcard/topspot/photos/judge_sheets/judge_sheet_{photo_token}.jpg",
         }
 
     def _remove_from_queue(self, item: dict) -> None:
@@ -110,6 +114,7 @@ class SimulatedHandheld:
             "handheld_id": self.handheld_id,
             "config_revision": self.config_revision,
             "data_revision": self.data_revision,
+            "known_car_count": len(self.roster),
             "battery_pct": self.battery_pct,
             "submissions": submissions,
         }
@@ -131,6 +136,8 @@ class SimulatedHandheld:
         self.data_revision = data["data_revision"]
         if data.get("configuration") is not None:
             self.configuration = data["configuration"]
+        if data.get("sync_mode") == "FULL":
+            self.roster = {}
         for car in data.get("cars", []):
             self.roster[car["entry_number"]] = car
         self.summary = data.get("summary")

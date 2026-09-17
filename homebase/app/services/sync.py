@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.schemas import CarOut, CategoryOut, ConfigurationOut, NominationOptionOut, ProtocolSummary, SubmissionIn
 from app.models import (
@@ -42,6 +42,7 @@ from app.models import (
     JudgingScore,
     JudgingSubmission,
     Show,
+    SubmissionSource,
     SubmissionStatus,
 )
 from app.services.revisions import bump_show_data_revision
@@ -72,14 +73,31 @@ def touch_handheld_sync(
     battery_pct: int | None,
     config_revision: int,
     data_revision: int,
+    firmware_version: str | None = None,
 ) -> None:
     handheld.last_sync_at = datetime.now(timezone.utc)
     if client_ip:
         handheld.last_ip = client_ip
     if battery_pct is not None:
         handheld.battery_pct = battery_pct
+    if firmware_version:
+        handheld.firmware_version = firmware_version
     handheld.last_config_revision = config_revision
     handheld.last_data_revision = data_revision
+    db.commit()
+
+
+def touch_handheld_handshake(
+    db: Session,
+    handheld: Handheld,
+    client_ip: str | None,
+    firmware_version: str | None,
+) -> None:
+    handheld.last_sync_at = datetime.now(timezone.utc)
+    if client_ip:
+        handheld.last_ip = client_ip
+    if firmware_version:
+        handheld.firmware_version = firmware_version
     db.commit()
 
 
@@ -100,6 +118,39 @@ def get_protocol_summary(db: Session, show_id: int) -> ProtocolSummary:
     )
 
 
+def get_authoritative_car_count(db: Session, show_id: int) -> int:
+    return db.scalar(select(func.count(Car.id)).where(Car.show_id == show_id)) or 0
+
+
+def _car_out(car: Car) -> CarOut:
+    accepted = next((s for s in car.submissions if s.status == SubmissionStatus.ACCEPTED), None)
+    return CarOut(
+        id=car.id,
+        entry_number=car.entry_number,
+        participant=car.participant,
+        year=car.year,
+        make=car.make,
+        model=car.model,
+        vehicle_type=car.vehicle_type,
+        status=car.status.value,
+        data_revision=car.data_revision_at_change,
+        judged_source=accepted.source.value if accepted is not None else None,
+        judged_at=accepted.closed_at if accepted is not None else None,
+    )
+
+
+def get_cars_snapshot(db: Session, show: Show) -> list[CarOut]:
+    cars = list(
+        db.scalars(
+            select(Car)
+            .where(Car.show_id == show.id)
+            .options(selectinload(Car.submissions))
+            .order_by(Car.entry_number)
+        )
+    )
+    return [_car_out(car) for car in cars]
+
+
 def get_configuration(db: Session, show: Show) -> ConfigurationOut:
     categories = list(
         db.scalars(
@@ -109,10 +160,18 @@ def get_configuration(db: Session, show: Show) -> ConfigurationOut:
         )
     )
     judge_chosen_awards = list(
-        db.scalars(select(Award).where(Award.show_id == show.id, Award.judge_chosen.is_(True)))
+        db.scalars(
+            select(Award)
+            .where(Award.show_id == show.id, Award.judge_chosen.is_(True), Award.active.is_(True))
+            .order_by(Award.sort_order)
+        )
     )
     return ConfigurationOut(
+        show_id=show.id,
         show_name=show.name,
+        show_date=show.event_date.isoformat() if show.event_date else None,
+        config_revision=show.configuration_revision,
+        active=True,
         score_range_max=show.score_range_max,
         max_score=len(categories) * show.score_range_max,
         overall_impression_enabled=show.overall_impression_enabled,
@@ -126,22 +185,11 @@ def get_cars_delta(db: Session, show: Show, since_data_revision: int) -> list[Ca
         db.scalars(
             select(Car)
             .where(Car.show_id == show.id, Car.data_revision_at_change > since_data_revision)
+            .options(selectinload(Car.submissions))
             .order_by(Car.entry_number)
         )
     )
-    return [
-        CarOut(
-            id=c.id,
-            entry_number=c.entry_number,
-            participant=c.participant,
-            year=c.year,
-            make=c.make,
-            model=c.model,
-            vehicle_type=c.vehicle_type,
-            status=c.status.value,
-        )
-        for c in cars
-    ]
+    return [_car_out(car) for car in cars]
 
 
 @dataclass
@@ -165,6 +213,36 @@ def _find_repeat(db: Session, entry_number: str, handheld_id: int, closed_at_upt
     ).first()
 
 
+def _canonical_entry_number(db: Session, show: Show, entry_number: str) -> tuple[str, Car | None]:
+    entered = entry_number.strip()
+    car = db.scalars(select(Car).where(Car.show_id == show.id, Car.entry_number == entered)).first()
+    if car is not None:
+        return car.entry_number, car
+
+    if not entered.isdigit():
+        return entered, None
+
+    entered_number = int(entered)
+    numeric_matches = [
+        candidate
+        for candidate in db.scalars(select(Car).where(Car.show_id == show.id))
+        if candidate.entry_number.isdigit() and int(candidate.entry_number) == entered_number
+    ]
+    if len(numeric_matches) == 1:
+        matched = numeric_matches[0]
+        logger.info("Entry %s normalized to roster entry %s for show %s.", entered, matched.entry_number, show.id)
+        return matched.entry_number, matched
+    if len(numeric_matches) > 1:
+        logger.warning(
+            "Entry %s matched multiple numeric roster entries for show %s: %s",
+            entered,
+            show.id,
+            [candidate.entry_number for candidate in numeric_matches],
+        )
+
+    return entered, None
+
+
 def _validate_scores(
     show: Show, item: SubmissionIn
 ) -> tuple[list[tuple[JudgingCategory, int]], str | None]:
@@ -186,10 +264,11 @@ def _validate_scores(
             problems.append(f"Unknown judging category id {score_in.category_id}.")
             continue
         seen_category_ids.add(category.id)
-        if not (1 <= score_in.points <= item.score_range_max):
+        allowed_range_max = min(item.score_range_max, show.score_range_max)
+        if not (1 <= score_in.points <= allowed_range_max):
             problems.append(
                 f"{category.name} score of {score_in.points} is outside the allowed range "
-                f"(1-{item.score_range_max})."
+                f"(1-{allowed_range_max})."
             )
             continue
         resolved.append((category, score_in.points))
@@ -235,7 +314,14 @@ def _apply_details(db: Session, show: Show, car: Car, item: SubmissionIn) -> Non
 
 
 def process_submission(db: Session, show: Show, handheld: Handheld, item: SubmissionIn) -> SubmissionResult:
-    entry_number = item.entry_number.strip()
+    if not item.vehicle_photo_path or not item.judge_sheet_photo_path:
+        return SubmissionResult(
+            entry_number=item.entry_number.strip(),
+            status="error",
+            message="Handheld submissions require vehicle and judge sheet photos.",
+        )
+
+    entry_number, car = _canonical_entry_number(db, show, item.entry_number)
 
     # 1. Idempotency — checked before anything else, including whether the
     # entry number even exists, so a retry is always recognized as such.
@@ -247,7 +333,6 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
             message="Already recorded — repeat of a submission already received.",
         )
 
-    car = db.scalars(select(Car).where(Car.show_id == show.id, Car.entry_number == entry_number)).first()
     if car is None:
         return SubmissionResult(
             entry_number=entry_number,
@@ -276,6 +361,11 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
         entry_number=entry_number,
         handheld_id=handheld.id,
         judge_name=item.judge_name,
+        source=SubmissionSource.HANDHELD,
+        vehicle_photo_required=True,
+        judge_sheet_photo_required=True,
+        vehicle_photo_path=item.vehicle_photo_path,
+        judge_sheet_photo_path=item.judge_sheet_photo_path,
         closed_at=datetime.now(timezone.utc),
         closed_at_uptime_ms=item.closed_at_uptime_ms,
         status=status,
@@ -302,7 +392,7 @@ def process_submission(db: Session, show: Show, handheld: Handheld, item: Submis
 
     for award_id in item.nominations:
         award = db.get(Award, award_id)
-        if award is not None and award.show_id == show.id and award.judge_chosen:
+        if award is not None and award.show_id == show.id and award.judge_chosen and award.active:
             db.add(AwardNomination(submission_id=submission.id, award_id=award_id))
 
     if status == SubmissionStatus.ACCEPTED:

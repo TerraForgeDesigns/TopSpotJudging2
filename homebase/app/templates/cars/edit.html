@@ -23,6 +23,7 @@
     {{ c.field("Vehicle Type", "vehicle_type", value=car.vehicle_type or "", required=False) }}
     <div class="row">
       {{ c.button("Save", "primary", type="submit") }}
+      <a href="/cars/{{ car.id }}/judge" class="btn btn-secondary">Manual Judge</a>
       <a href="/cars" class="btn btn-secondary">Cancel</a>
     </div>
   </form>

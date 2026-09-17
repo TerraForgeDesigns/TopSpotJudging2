@@ -16,6 +16,8 @@
       <tr>
         <th>Label</th>
         <th>Last Update</th>
+        <th>IP</th>
+        <th>Firmware</th>
         <th class="col-num">Battery</th>
         <th>Status</th>
       </tr>
@@ -25,6 +27,8 @@
       <tr>
         <td>{{ hs.handheld.label }}</td>
         <td>{{ hs.relative_sync }}</td>
+        <td>{{ hs.handheld.last_ip or "Not reported" }}</td>
+        <td>{{ hs.handheld.firmware_version or "Not reported" }}</td>
         <td class="col-num">{{ hs.battery_pct ~ "%" if hs.battery_pct is not none else "—" }}</td>
         <td>
           {% if hs.sync_state == "fresh" %}

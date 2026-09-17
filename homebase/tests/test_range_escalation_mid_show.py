@@ -109,6 +109,8 @@ def test_140_cars_at_1_5_then_40_more_cars_escalates_and_converts_correctly(clie
             "scores": [{"category_id": hh3.category_id(cat), "points": 3} for cat in CATEGORIES],
             "overall_impression": None,
             "nominations": [],
+            "vehicle_photo_path": "/sdcard/topspot/photos/vehicle/vehicle_141_00999999.jpg",
+            "judge_sheet_photo_path": "/sdcard/topspot/photos/judge_sheets/judge_sheet_141_00999999.jpg",
         }
     )
     response = hh3.check_in()

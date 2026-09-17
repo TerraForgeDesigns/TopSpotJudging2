@@ -34,6 +34,11 @@ class SubmissionStatus(str, enum.Enum):
     # later reconciliation. See DECISIONS.md.
 
 
+class SubmissionSource(str, enum.Enum):
+    HANDHELD = "handheld"
+    HOMEBASE_MANUAL = "homebase_manual"
+
+
 class PhotoType(str, enum.Enum):
     CAR = "car"
     JUDGE_SHEET = "judge_sheet"

@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, utcnow
-from app.models.enums import SubmissionStatus
+from app.models.enums import SubmissionSource, SubmissionStatus
 
 
 class JudgingSubmission(Base):
@@ -45,8 +45,18 @@ class JudgingSubmission(Base):
     show_id: Mapped[int] = mapped_column(ForeignKey("shows.id"), nullable=False, index=True)
     car_id: Mapped[int] = mapped_column(ForeignKey("cars.id"), nullable=False, index=True)
     entry_number: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    handheld_id: Mapped[int] = mapped_column(ForeignKey("handhelds.id"), nullable=False, index=True)
+    handheld_id: Mapped[int | None] = mapped_column(ForeignKey("handhelds.id"), nullable=True, index=True)
     judge_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source: Mapped[SubmissionSource] = mapped_column(
+        Enum(SubmissionSource, native_enum=False, validate_strings=True, length=32),
+        default=SubmissionSource.HANDHELD,
+        nullable=False,
+    )
+    operator_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    vehicle_photo_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    judge_sheet_photo_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    vehicle_photo_path: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    judge_sheet_photo_path: Mapped[str | None] = mapped_column(String(240), nullable=True)
     # Set when a host enters a corrected score set to resolve a conflict —
     # the rationale for overriding what the judges actually submitted.
     # Null for ordinary handheld submissions.

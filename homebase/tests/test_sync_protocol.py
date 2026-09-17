@@ -21,6 +21,7 @@ from app.models import (
     VehicleCandidate,
     VehicleCandidateSighting,
 )
+from app.models.enums import CarStatus
 from app.services.shows import set_active_show
 
 
@@ -39,11 +40,20 @@ def show_with_two_categories(db_session):
     return show, engine, paint, car
 
 
-def _sync(client, handheld_id="hh-1", config_revision=0, data_revision=0, submissions=None, battery_pct=80):
+def _sync(
+    client,
+    handheld_id="hh-1",
+    config_revision=0,
+    data_revision=0,
+    submissions=None,
+    battery_pct=80,
+    known_car_count=0,
+):
     payload = {
         "handheld_id": handheld_id,
         "config_revision": config_revision,
         "data_revision": data_revision,
+        "known_car_count": known_car_count,
         "battery_pct": battery_pct,
         "submissions": submissions or [],
     }
@@ -58,6 +68,8 @@ def _full_submission(entry_number, engine_id, paint_id, closed_at_uptime_ms=1000
         "closed_at_uptime_ms": closed_at_uptime_ms,
         "score_range_max": score_range_max,
         "scores": [{"category_id": engine_id, "points": 4}, {"category_id": paint_id, "points": 3}],
+        "vehicle_photo_path": "/sdcard/topspot/photos/vehicle/test.jpg",
+        "judge_sheet_photo_path": "/sdcard/topspot/photos/judge_sheets/test.jpg",
     }
     body.update(overrides)
     return body
@@ -76,6 +88,7 @@ def test_first_update_at_revision_zero_returns_full_configuration_and_cars(clien
     assert len(result["configuration"]["categories"]) == 2
     assert len(result["cars"]) == 1
     assert result["cars"][0]["entry_number"] == "001"
+    assert result["sync_mode"] == "FULL"
     assert result["config_revision"] == show.configuration_revision
     assert result["data_revision"] == show.show_data_revision
 
@@ -86,10 +99,11 @@ def test_config_stale_only_returns_configuration_but_no_cars(client, db_session,
     # latest Show Setup change.
     current_data_revision = show.show_data_revision
 
-    result = _sync(client, config_revision=0, data_revision=current_data_revision)
+    result = _sync(client, config_revision=0, data_revision=current_data_revision, known_car_count=1)
 
     assert result["configuration"] is not None
     assert result["cars"] == []
+    assert result["sync_mode"] == "DELTA"
 
 
 def test_data_stale_only_returns_cars_but_no_configuration(client, db_session, show_with_two_categories):
@@ -100,15 +114,88 @@ def test_data_stale_only_returns_cars_but_no_configuration(client, db_session, s
 
     assert result["configuration"] is None
     assert len(result["cars"]) == 1
+    assert result["sync_mode"] == "FULL"
 
 
 def test_both_current_returns_neither(client, db_session, show_with_two_categories):
     show, engine, paint, car = show_with_two_categories
 
-    result = _sync(client, config_revision=show.configuration_revision, data_revision=show.show_data_revision)
+    result = _sync(
+        client,
+        config_revision=show.configuration_revision,
+        data_revision=show.show_data_revision,
+        known_car_count=1,
+    )
 
     assert result["configuration"] is None
     assert result["cars"] == []
+    assert result["sync_mode"] == "DELTA"
+
+
+def test_incomplete_known_roster_forces_full_snapshot_even_when_revision_current(client, db_session, show_with_two_categories):
+    show, engine, paint, car = show_with_two_categories
+    db_session.add(Car(show_id=show.id, entry_number="002", data_revision_at_change=show.show_data_revision))
+    db_session.add(Car(show_id=show.id, entry_number="003", data_revision_at_change=show.show_data_revision))
+    db_session.commit()
+
+    result = _sync(
+        client,
+        config_revision=show.configuration_revision,
+        data_revision=show.show_data_revision,
+        known_car_count=1,
+    )
+
+    assert result["sync_mode"] == "FULL"
+    assert [car["entry_number"] for car in result["cars"]] == ["001", "002", "003"]
+
+
+def test_zero_known_roster_forces_full_300_car_snapshot_even_when_revision_current(
+    client, db_session, show_with_two_categories
+):
+    show, engine, paint, car = show_with_two_categories
+    for index in range(2, 301):
+        db_session.add(Car(show_id=show.id, entry_number=f"{index:03d}", data_revision_at_change=show.show_data_revision))
+    db_session.commit()
+
+    result = _sync(
+        client,
+        config_revision=show.configuration_revision,
+        data_revision=show.show_data_revision,
+        known_car_count=0,
+    )
+
+    assert result["sync_mode"] == "FULL"
+    assert len(result["cars"]) == 300
+    assert result["cars"][0]["entry_number"] == "001"
+    assert result["cars"][-1]["entry_number"] == "300"
+
+
+def test_complete_known_roster_receives_three_car_delta_without_losing_unmentioned_entries(
+    client, db_session, show_with_two_categories
+):
+    show, engine, paint, car = show_with_two_categories
+    for index in range(2, 301):
+        db_session.add(Car(show_id=show.id, entry_number=f"{index:03d}", data_revision_at_change=show.show_data_revision))
+    db_session.commit()
+    before_revision = show.show_data_revision
+
+    for entry in ("016", "021", "022"):
+        target = db_session.scalars(select(Car).where(Car.show_id == show.id, Car.entry_number == entry)).one()
+        target.status = CarStatus.JUDGED
+        show.show_data_revision += 1
+        target.data_revision_at_change = show.show_data_revision
+    db_session.commit()
+
+    result = _sync(
+        client,
+        config_revision=show.configuration_revision,
+        data_revision=before_revision,
+        known_car_count=300,
+    )
+
+    assert result["sync_mode"] == "DELTA"
+    assert [car["entry_number"] for car in result["cars"]] == ["016", "021", "022"]
+    assert all(car["status"] == "judged" for car in result["cars"])
 
 
 def test_empty_check_in_succeeds_and_still_returns_summary_and_server_time(client, show_with_two_categories):
@@ -146,6 +233,8 @@ def test_missing_category_score_is_rejected(client, show_with_two_categories):
         "closed_at_uptime_ms": 1000,
         "score_range_max": 5,
         "scores": [{"category_id": engine.id, "points": 4}],  # Paint missing
+        "vehicle_photo_path": "/sdcard/topspot/photos/vehicle/test.jpg",
+        "judge_sheet_photo_path": "/sdcard/topspot/photos/judge_sheets/test.jpg",
     }
 
     result = _sync(client, submissions=[submission])

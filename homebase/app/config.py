@@ -20,3 +20,7 @@ PHOTOS_DIR.mkdir(exist_ok=True)
 
 HOST = os.environ.get("TOPSPOT_HOST", "0.0.0.0")
 PORT = int(os.environ.get("TOPSPOT_PORT", "8000"))
+SERVICE_NAME = "topspot-homebase"
+PROTOCOL_VERSION = 1
+DISCOVERY_HOSTNAME = os.environ.get("TOPSPOT_DISCOVERY_HOSTNAME", "topspot-homebase.local")
+DISCOVERY_PORT = int(os.environ.get("TOPSPOT_DISCOVERY_PORT", "37020"))

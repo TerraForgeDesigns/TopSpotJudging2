@@ -47,6 +47,8 @@ def _submit(client, handheld_id, entry_number, closed_at_uptime_ms, category_id,
                 "closed_at_uptime_ms": closed_at_uptime_ms,
                 "score_range_max": score_range_max,
                 "scores": [{"category_id": category_id, "points": points}],
+                "vehicle_photo_path": "/sdcard/topspot/photos/vehicle/test.jpg",
+                "judge_sheet_photo_path": "/sdcard/topspot/photos/judge_sheets/test.jpg",
             }
         ],
     }

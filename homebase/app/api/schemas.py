@@ -14,6 +14,7 @@ class ScoreIn(BaseModel):
 
 
 class SubmissionIn(BaseModel):
+    local_record_id: str | None = None
     entry_number: str
     judge_name: str | None = None
     closed_at_uptime_ms: int
@@ -28,14 +29,36 @@ class SubmissionIn(BaseModel):
     scores: list[ScoreIn] = Field(default_factory=list)
     overall_impression: int | None = None
     nominations: list[int] = Field(default_factory=list)  # award ids
+    vehicle_photo_path: str | None = None
+    judge_sheet_photo_path: str | None = None
 
 
 class SyncRequest(BaseModel):
     handheld_id: str
     config_revision: int
     data_revision: int
+    known_car_count: int = 0
     battery_pct: int | None = None
+    firmware_version: str | None = None
+    protocol_version: int | None = None
+    rssi_dbm: int | None = None
     submissions: list[SubmissionIn] = Field(default_factory=list)
+
+
+class HandshakeRequest(BaseModel):
+    handheld_id: str
+    firmware_version: str | None = None
+    protocol_version: int = 1
+    rssi_dbm: int | None = None
+
+
+class HandshakeResponse(BaseModel):
+    service: str
+    status: str
+    protocol_version: int
+    server_time: datetime
+    show_name: str | None
+    handheld_id: str
 
 
 class ResultItem(BaseModel):
@@ -80,7 +103,11 @@ class NominationOptionOut(BaseModel):
 
 
 class ConfigurationOut(BaseModel):
+    show_id: int
     show_name: str
+    show_date: str | None = None
+    config_revision: int
+    active: bool = True
     score_range_max: int
     # Computed server-side (active categories x score_range_max) so a
     # handheld never derives it independently and never disagrees with
@@ -100,12 +127,16 @@ class CarOut(BaseModel):
     model: str | None
     vehicle_type: str | None
     status: str
+    data_revision: int
+    judged_source: str | None = None
+    judged_at: datetime | None = None
 
 
 class SyncResponse(BaseModel):
     server_time: datetime
     config_revision: int
     data_revision: int
+    sync_mode: str
     configuration: ConfigurationOut | None
     cars: list[CarOut]
     # Approved vehicle names — full semantics defined by SPEC-B (the
@@ -119,5 +150,8 @@ class SyncResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
+    service: str
+    status: str
+    protocol_version: int
     server_time: datetime
     show_name: str | None

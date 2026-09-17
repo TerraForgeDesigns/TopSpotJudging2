@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.services.manual_judging import get_manual_judge_context, manual_judge_car
 from app.services.cars import get_car, list_cars, update_car_details
 from app.templating import templates
 from app.web.context import base_context, require_active_show
@@ -62,3 +63,82 @@ def edit_car_submit(
 
     update_car_details(db, show, car, participant, year, make, model, vehicle_type)
     return RedirectResponse("/cars", status_code=303)
+
+
+@router.get("/cars/{car_id}/judge")
+def manual_judge_form(
+    car_id: int,
+    request: Request,
+    replace: bool = False,
+    db: Session = Depends(get_db),
+):
+    show = require_active_show(db)
+    if show is None:
+        return RedirectResponse("/shows", status_code=303)
+
+    ctx = get_manual_judge_context(db, show, car_id)
+    if ctx is None:
+        return RedirectResponse("/cars", status_code=303)
+
+    context = base_context(request, db, "/cars")
+    context["ctx"] = ctx
+    context["replace"] = replace
+    context["error"] = ""
+    context["score_values"] = {}
+    context["selected_awards"] = set()
+    return templates.TemplateResponse(request, "cars/manual_judge.html", context)
+
+
+@router.post("/cars/{car_id}/judge")
+async def manual_judge_submit(
+    car_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    show = require_active_show(db)
+    if show is None:
+        return RedirectResponse("/shows", status_code=303)
+
+    form = await request.form()
+    replace = form.get("replace_existing") == "1"
+    scores: dict[int, int] = {}
+    for key, value in form.multi_items():
+        if key.startswith("score_"):
+            try:
+                scores[int(key.removeprefix("score_"))] = int(str(value))
+            except ValueError:
+                continue
+
+    nomination_ids: list[int] = []
+    for value in form.getlist("nominations"):
+        try:
+            nomination_ids.append(int(str(value)))
+        except ValueError:
+            continue
+
+    result = manual_judge_car(
+        db,
+        show,
+        car_id,
+        scores_by_category_id=scores,
+        nomination_ids=nomination_ids,
+        participant=str(form.get("participant", "")),
+        year=str(form.get("year", "")),
+        make=str(form.get("make", "")),
+        model=str(form.get("model", "")),
+        operator_label=str(form.get("operator_label", "")),
+        replace_existing=replace,
+    )
+    if result.ok:
+        return RedirectResponse("/cars", status_code=303)
+
+    ctx = get_manual_judge_context(db, show, car_id)
+    if ctx is None:
+        return RedirectResponse("/cars", status_code=303)
+    context = base_context(request, db, "/cars")
+    context["ctx"] = ctx
+    context["replace"] = replace
+    context["error"] = result.message
+    context["score_values"] = scores
+    context["selected_awards"] = set(nomination_ids)
+    return templates.TemplateResponse(request, "cars/manual_judge.html", context, status_code=400)

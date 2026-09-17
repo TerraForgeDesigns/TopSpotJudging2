@@ -69,7 +69,9 @@
         </td>
         <td class="col-num">{{ row.score if row.score is not none else "—" }}</td>
         <td>
-          {% if photo_count == 2 %}
+          {% if row.car.status.value == "judged" and not row.photos_required %}
+          {{ c.pill("Not Required", "pending") }}
+          {% elif photo_count == 2 %}
           {{ c.pill("Both", "judged") }}
           {% elif photo_count == 1 %}
           {{ c.pill("1 of 2", "pending") }}
@@ -79,7 +81,12 @@
           <span style="color: var(--text-secondary);">—</span>
           {% endif %}
         </td>
-        <td><a href="/cars/{{ row.car.id }}/edit" class="btn btn-secondary btn--sm">Edit</a></td>
+        <td>
+          <div class="row" style="gap: var(--space-2); flex-wrap: nowrap;">
+            <a href="/cars/{{ row.car.id }}/judge" class="btn btn-primary btn--sm">Manual Judge</a>
+            <a href="/cars/{{ row.car.id }}/edit" class="btn btn-secondary btn--sm">Edit</a>
+          </div>
+        </td>
       </tr>
       {% endfor %}
       <tr data-empty-row hidden>
