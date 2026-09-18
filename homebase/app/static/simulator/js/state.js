@@ -100,9 +100,9 @@ export function getEntries() {
 export function findEntry(entryNumber) {
   return getEntries().find((e) => e.entry_number === entryNumber) || null;
 }
-export function mergeEntries(delta) {
-  if (!delta || delta.length === 0) return;
-  const existing = getEntries();
+export function mergeEntries(delta, fullSnapshot = false) {
+  if (!delta || (delta.length === 0 && !fullSnapshot)) return;
+  const existing = fullSnapshot ? [] : getEntries();
   const byNumber = new Map(existing.map((e) => [e.entry_number, e]));
   for (const e of delta) byNumber.set(e.entry_number, e);
   save(ENTRIES_KEY, Array.from(byNumber.values()));

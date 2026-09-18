@@ -45,11 +45,13 @@ def _sync(
     submissions=None,
     protocol_version=1,
     known_car_count=0,
+    show_id=0,
 ):
     response = client.post(
         "/api/v1/sync",
         json={
             "handheld_id": handheld_id,
+            "show_id": show_id,
             "config_revision": config_revision,
             "data_revision": data_revision,
             "known_car_count": known_car_count,
@@ -138,6 +140,7 @@ def test_config_only_sync_response_shape_matches_p4_parser(client, db_session):
         client,
         config_revision=0,
         data_revision=show.show_data_revision,
+        show_id=show.id,
         submissions=[],
         known_car_count=len(cars),
     )

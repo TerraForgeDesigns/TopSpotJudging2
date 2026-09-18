@@ -48,9 +48,11 @@ def _sync(
     submissions=None,
     battery_pct=80,
     known_car_count=0,
+    show_id=0,
 ):
     payload = {
         "handheld_id": handheld_id,
+        "show_id": show_id,
         "config_revision": config_revision,
         "data_revision": data_revision,
         "known_car_count": known_car_count,
@@ -73,6 +75,68 @@ def _full_submission(entry_number, engine_id, paint_id, closed_at_uptime_ms=1000
     }
     body.update(overrides)
     return body
+
+
+@pytest.mark.parametrize("known_car_count,data_revision", [(0, 1), (1, 1), (1, 999)])
+def test_show_switch_overrides_equal_config_revision(
+    client, db_session, show_with_two_categories, known_car_count, data_revision
+):
+    show, engine, paint, car = show_with_two_categories
+    assert show.id == 1
+    assert show.configuration_revision == 1
+    old_show = Show(name="Old cached show", event_date=date(2026, 8, 1), score_range_max=5)
+    db_session.add(old_show)
+    db_session.flush()
+    assert old_show.id == 2
+    db_session.add(Car(show_id=old_show.id, entry_number="OLD", data_revision_at_change=1))
+    db_session.commit()
+    set_active_show(db_session, old_show.id)
+    set_active_show(db_session, show.id)
+
+    result = _sync(
+        client, show_id=old_show.id, config_revision=1,
+        data_revision=data_revision, known_car_count=known_car_count,
+    )
+
+    assert result["configuration"]["show_id"] == show.id
+    assert result["config_revision"] == 1
+    assert result["sync_mode"] == "FULL"
+    assert [item["id"] for item in result["cars"]] == [car.id]
+    assert result["data_revision"] == show.show_data_revision
+
+
+@pytest.mark.parametrize("entries", [[], ["NEW"]])
+def test_show_switch_replaces_simulated_roster(client, db_session, show_with_two_categories, entries):
+    from tests.handheld_simulator import SimulatedHandheld
+
+    show, engine, paint, car = show_with_two_categories
+    handheld = SimulatedHandheld(client, "switch-test")
+    handheld.check_in()
+    assert handheld.roster
+    new_show = Show(name="New show", event_date=date(2026, 9, 2), score_range_max=5)
+    db_session.add(new_show)
+    db_session.flush()
+    for entry in entries:
+        db_session.add(Car(show_id=new_show.id, entry_number=entry, data_revision_at_change=1))
+    db_session.commit()
+    set_active_show(db_session, new_show.id)
+
+    handheld.check_in()
+
+    assert handheld.configuration["show_id"] == new_show.id
+    assert handheld.last_response["sync_mode"] == "FULL"
+    assert set(handheld.roster) == set(entries)
+
+
+def test_legacy_request_without_show_id_forces_refresh(client, show_with_two_categories):
+    show, engine, paint, car = show_with_two_categories
+    response = client.post("/api/v1/sync", json={
+        "handheld_id": "legacy", "config_revision": show.configuration_revision,
+        "data_revision": show.show_data_revision, "known_car_count": 1,
+    })
+    assert response.status_code == 200
+    assert response.json()["configuration"]["show_id"] == show.id
+    assert response.json()["sync_mode"] == "FULL"
 
 
 # ---------------------------------------------------------------------
@@ -99,7 +163,7 @@ def test_config_stale_only_returns_configuration_but_no_cars(client, db_session,
     # latest Show Setup change.
     current_data_revision = show.show_data_revision
 
-    result = _sync(client, config_revision=0, data_revision=current_data_revision, known_car_count=1)
+    result = _sync(client, show_id=show.id, config_revision=0, data_revision=current_data_revision, known_car_count=1)
 
     assert result["configuration"] is not None
     assert result["cars"] == []
@@ -110,7 +174,7 @@ def test_data_stale_only_returns_cars_but_no_configuration(client, db_session, s
     show, engine, paint, car = show_with_two_categories
     current_config_revision = show.configuration_revision
 
-    result = _sync(client, config_revision=current_config_revision, data_revision=0)
+    result = _sync(client, show_id=show.id, config_revision=current_config_revision, data_revision=0)
 
     assert result["configuration"] is None
     assert len(result["cars"]) == 1
@@ -123,6 +187,7 @@ def test_both_current_returns_neither(client, db_session, show_with_two_categori
     result = _sync(
         client,
         config_revision=show.configuration_revision,
+        show_id=show.id,
         data_revision=show.show_data_revision,
         known_car_count=1,
     )
@@ -140,6 +205,7 @@ def test_incomplete_known_roster_forces_full_snapshot_even_when_revision_current
 
     result = _sync(
         client,
+        show_id=show.id,
         config_revision=show.configuration_revision,
         data_revision=show.show_data_revision,
         known_car_count=1,
@@ -159,6 +225,7 @@ def test_zero_known_roster_forces_full_300_car_snapshot_even_when_revision_curre
 
     result = _sync(
         client,
+        show_id=show.id,
         config_revision=show.configuration_revision,
         data_revision=show.show_data_revision,
         known_car_count=0,
@@ -190,6 +257,7 @@ def test_complete_known_roster_receives_three_car_delta_without_losing_unmention
         client,
         config_revision=show.configuration_revision,
         data_revision=before_revision,
+        show_id=show.id,
         known_car_count=300,
     )
 

@@ -35,6 +35,7 @@ class SubmissionIn(BaseModel):
 
 class SyncRequest(BaseModel):
     handheld_id: str
+    show_id: int = Field(default=0, ge=0)
     config_revision: int
     data_revision: int
     known_car_count: int = 0

@@ -152,6 +152,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "Wi-Fi station starting");
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+        ESP_LOGW(TAG, "Wi-Fi disconnected: reason=%d, SSID=%.*s", event->reason,
+                 (int)event->ssid_len, (const char *)event->ssid);
         lock_network();
         s_net.wifi_connected = false;
         s_net.homebase_connected = false;
@@ -949,10 +952,10 @@ static void apply_car_status_from_sync_response(top_spot_app_state_t *state, cJS
     cJSON *sync_mode = cJSON_GetObjectItemCaseSensitive(json, "sync_mode");
     int new_data_revision = cJSON_IsNumber(data_revision) ? data_revision->valueint : state->show.data_revision;
     int car_delta_count = cJSON_IsArray(cars) ? cJSON_GetArraySize(cars) : 0;
-    if (car_delta_count <= 0 || state->show.show_id <= 0) {
+    bool full_snapshot = cJSON_IsString(sync_mode) && strcmp(sync_mode->valuestring, "FULL") == 0;
+    if (!cJSON_IsArray(cars) || (car_delta_count <= 0 && !full_snapshot) || state->show.show_id <= 0) {
         return;
     }
-    bool full_snapshot = cJSON_IsString(sync_mode) && strcmp(sync_mode->valuestring, "FULL") == 0;
     log_network_stack_headroom("before car-status apply_sync");
     esp_err_t err = top_spot_car_status_store_apply_sync(state, cars, state->show.show_id, new_data_revision, full_snapshot);
     log_network_stack_headroom("after car-status apply_sync");
@@ -1042,6 +1045,7 @@ static char *post_sync_request(const char *base_url, const char *handheld_id, in
         return NULL;
     }
     cJSON_AddStringToObject(root, "handheld_id", handheld_id);
+    cJSON_AddNumberToObject(root, "show_id", show->loaded && show->show_id > 0 ? show->show_id : 0);
     cJSON_AddNumberToObject(root, "config_revision", show->config_revision);
     cJSON_AddNumberToObject(root, "data_revision", show->data_revision);
     int known_car_count = top_spot_car_status_count();

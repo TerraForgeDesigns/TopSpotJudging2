@@ -112,6 +112,7 @@ class SimulatedHandheld:
     def _post(self, submissions: list[dict]) -> dict:
         payload = {
             "handheld_id": self.handheld_id,
+            "show_id": self.configuration["show_id"] if self.configuration else 0,
             "config_revision": self.config_revision,
             "data_revision": self.data_revision,
             "known_car_count": len(self.roster),

@@ -67,11 +67,15 @@ bool buildRequestBody() {
     storage::SyncState syncState;
     storage::loadSyncState(&syncState);
 
+    storage::ShowInfo show;
+    storage::loadShowInfo(&show);
+
     storage::QueuedCar cars[MAX_SYNC_BATCH];
     int carCount = storage::listQueuedCars(cars, MAX_SYNC_BATCH);
 
     DynamicJsonDocument doc(static_cast<size_t>(carCount) * 700 + 2048);
     doc["handheld_id"] = settings.handheldLabel;
+    doc["show_id"] = show.showId > 0 ? show.showId : 0;
     doc["config_revision"] = syncState.lastConfigRevisionApplied;
     doc["data_revision"] = syncState.lastDataRevisionApplied;
     // No battery ADC pin identified yet (storage/settings.h, DECISIONS.md)
@@ -282,10 +286,11 @@ void applyHit() {
         }
     }
 
-    // --- cars[]: merge delta onto the entries cache (never a replace) ---
+    // --- cars[]: replace FULL rosters, merge same-show deltas ---
     JsonArrayConst carsArr = doc["cars"].as<JsonArrayConst>();
+    bool fullSnapshot = strcmp(doc["sync_mode"] | "", "FULL") == 0;
     int deltaCount = carsArr.size();
-    if (deltaCount > 0) {
+    if (deltaCount > 0 || fullSnapshot) {
         auto* delta = new storage::Entry[deltaCount];
         int i = 0;
         for (JsonVariantConst c : carsArr) {
@@ -297,7 +302,11 @@ void applyHit() {
             strncpy(e.model, c["model"] | "", sizeof(e.model) - 1);
             strncpy(e.vehicleType, c["vehicle_type"] | "", sizeof(e.vehicleType) - 1);
         }
-        storage::mergeEntries(delta, deltaCount);
+        if (fullSnapshot) {
+            storage::saveEntries(delta, deltaCount);
+        } else {
+            storage::mergeEntries(delta, deltaCount);
+        }
         delete[] delta;
     }
 

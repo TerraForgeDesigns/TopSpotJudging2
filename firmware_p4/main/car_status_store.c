@@ -31,7 +31,7 @@ typedef struct {
     char entries[TOP_SPOT_MAX_SAVED_RECORDS][sizeof(((top_spot_record_t *)0)->entry_number)];
 } pending_entry_snapshot_t;
 
-static void collect_pending_entries(pending_entry_snapshot_t *pending);
+static void collect_pending_entries(pending_entry_snapshot_t *pending, int show_id);
 static int overlay_pending_on_cache(top_spot_car_cache_t *cache, const pending_entry_snapshot_t *pending);
 
 static void *car_status_alloc(size_t size)
@@ -370,7 +370,7 @@ esp_err_t top_spot_car_status_store_apply_sync(top_spot_app_state_t *state, cJSO
     ESP_LOGI(TAG, "CAR STATUS SYNC: pending alloc=%p location=%s working_cache alloc=%p location=%s",
              pending, alloc_location(pending), working, alloc_location(working));
 
-    collect_pending_entries(pending);
+    collect_pending_entries(pending, show_id);
     log_stack_headroom("apply_sync after pending collect");
 
     int existing = 0;
@@ -501,7 +501,7 @@ esp_err_t top_spot_car_status_store_init(top_spot_app_state_t *state)
         ESP_LOGI(TAG, "BOOT TRACE: car_status_store_init pending alloc=%p location=%s size=%u",
                  pending, alloc_location(pending), (unsigned)sizeof(*pending));
         ESP_LOGI(TAG, "BOOT TRACE: car_status_store_init before pending collect");
-        collect_pending_entries(pending);
+        collect_pending_entries(pending, state->show.show_id);
         ESP_LOGI(TAG, "BOOT TRACE: car_status_store_init before local pending overlay");
         overlay_pending_on_cache(loaded, pending);
         ESP_LOGI(TAG, "BOOT TRACE: car_status_store_init after local pending overlay");
@@ -633,7 +633,7 @@ bool top_spot_car_status_entry_is_pending(const char *entry)
     return false;
 }
 
-static void collect_pending_entries(pending_entry_snapshot_t *pending)
+static void collect_pending_entries(pending_entry_snapshot_t *pending, int show_id)
 {
     memset(pending, 0, sizeof(*pending));
     int record_count = top_spot_record_store_count();
@@ -643,7 +643,7 @@ static void collect_pending_entries(pending_entry_snapshot_t *pending)
     ESP_LOGI(TAG, "BOOT TRACE: already-judged collect pending start records=%d", record_count);
     for (int i = 0; i < record_count; i++) {
         const top_spot_record_t *record = top_spot_record_store_get((size_t)i);
-        if (record == NULL) {
+        if (record == NULL || record->show_id != show_id) {
             continue;
         }
         if (strcmp(record->sync_state, TOP_SPOT_SYNC_PENDING) == 0 && record->entry_number[0] != '\0') {
@@ -698,7 +698,7 @@ void top_spot_car_status_overlay_pending(void)
         return;
     }
     pending_entry_snapshot_t pending;
-    collect_pending_entries(&pending);
+    collect_pending_entries(&pending, s_state->car_cache.show_id);
     lock_cache();
     overlay_pending_on_cache(&s_state->car_cache, &pending);
     unlock_cache();

@@ -20,6 +20,7 @@ function buildRequestBody() {
   const syncState = state.getSyncState();
   return {
     handheld_id: settings.handheldLabel,
+    show_id: state.getShowInfo().showId || 0,
     config_revision: syncState.lastConfigRevisionApplied,
     data_revision: syncState.lastDataRevisionApplied,
     battery_pct: null, // no battery model in the simulator — honestly null, same as firmware's F7 stance
@@ -61,6 +62,7 @@ async function applyHit(response) {
     const cfg = response.configuration;
     const after = {
       ...before,
+      showId: cfg.show_id,
       showName: cfg.show_name ?? before.showName,
       scoreRangeMax: cfg.score_range_max ?? before.scoreRangeMax,
       maxScore: cfg.max_score ?? before.maxScore,
@@ -81,7 +83,7 @@ async function applyHit(response) {
     }
   }
 
-  if (response.cars && response.cars.length > 0) {
+  if (response.cars && (response.cars.length > 0 || response.sync_mode === "FULL")) {
     state.mergeEntries(
       response.cars.map((c) => ({
         entry_number: c.entry_number,
@@ -90,7 +92,8 @@ async function applyHit(response) {
         make: c.make || "",
         model: c.model || "",
         vehicle_type: c.vehicle_type || "",
-      }))
+      })),
+      response.sync_mode === "FULL"
     );
   }
 

@@ -95,11 +95,12 @@ def sync(payload: SyncRequest, request: Request, db: Session = Depends(get_db)):
     db.refresh(show)
     summary = sync_service.get_protocol_summary(db, show.id)
     authoritative_count = sync_service.get_authoritative_car_count(db, show.id)
-    full_roster_needed = payload.data_revision <= 0 or payload.known_car_count != authoritative_count
+    show_changed = payload.show_id != show.id
+    full_roster_needed = show_changed or payload.data_revision <= 0 or payload.known_car_count != authoritative_count
     sync_mode = "FULL" if full_roster_needed else "DELTA"
 
     configuration = None
-    if payload.config_revision < show.configuration_revision:
+    if show_changed or payload.config_revision < show.configuration_revision:
         configuration = sync_service.get_configuration(db, show)
 
     cars = []

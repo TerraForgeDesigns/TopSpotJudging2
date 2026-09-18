@@ -84,9 +84,8 @@ struct Entry {
 bool findEntry(const char* entryNumber, Entry* out);
 
 // Replaces the entire local entry cache — used only when the FULL roster
-// is known at once (e.g. a from-scratch rebuild). A sync response's
-// `cars[]` is a DELTA, not the full roster (see PROTOCOL.md) — use
-// mergeEntries() for that, not this.
+// is known at once (sync_mode FULL). Use mergeEntries() for DELTA
+// responses (see PROTOCOL.md).
 bool saveEntries(const Entry* entries, int count);
 
 // Overlays `delta` onto the existing cache: an entry number already

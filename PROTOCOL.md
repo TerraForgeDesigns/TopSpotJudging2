@@ -47,8 +47,10 @@ Request:
 ```jsonc
 {
   "handheld_id": "hh-2",
+  "show_id": 42,                 // cached active Show.id; 0 when no valid show is cached
   "config_revision": 4,          // last configuration_revision this handheld applied
   "data_revision": 812,          // last show_data_revision this handheld applied
+  "known_car_count": 310,        // number of cars in the handheld's cached roster
   "battery_pct": 62,
   "submissions": [
     {
@@ -84,8 +86,9 @@ Response:
   "server_time": "2026-08-30T14:32:11Z",       // handheld sets its clock from this
   "config_revision": 4,
   "data_revision": 814,
-  "configuration": { /* ... */ } | null,       // only when the handheld's copy is stale
-  "cars": [ /* ... */ ],                       // only entries changed since data_revision
+  "sync_mode": "DELTA",                       // "FULL" replaces the entire cached roster
+  "configuration": { /* ... */ } | null,       // show changed or configuration revision is stale
+  "cars": [ /* ... */ ],                       // complete roster for FULL; changed entries for DELTA
   "vehicle_additions": [ /* ... */ ],          // approved vehicle names — see note below
   "results": [
     { "entry_number": "142", "status": "accepted", "message": "" }
@@ -105,6 +108,24 @@ delta.** It's a show-wide progress snapshot that every handheld displays on its 
 bar, regardless of whether the rest of the response is a delta or a full pull.
 
 #### Revision counters, not timestamps
+
+Every sync request sends the cached active `show_id` as a nonnegative integer,
+or `0` when no valid show is cached. For older clients that omit it, Home Base
+defaults it to `0`, forcing an authoritative refresh.
+
+Home Base computes `show_changed = request.show_id != active_show.id`.
+Configuration is sent when `show_changed` or the requested `config_revision`
+is lower than the active show's configuration revision. Sync mode is `FULL`
+when `show_changed`, `data_revision <= 0`, or `known_car_count` differs from
+the authoritative roster count. FULL always returns the complete active-show
+roster, ignoring revisions from another show. Otherwise mode is `DELTA` and
+only cars changed since the requested data revision are returned.
+
+The handheld adopts and persists received configuration, including its show ID.
+A FULL roster replaces the cached car list, including when the list is empty;
+old-show cars must never be merged into the new show. Local pending-status
+overlays apply only to records belonging to that roster's show. Submission
+acknowledgements and retry behavior are unchanged.
 
 Home Base maintains two monotonically increasing integers per show:
 
